@@ -487,12 +487,14 @@ int initWin(HWND hwnd)
 BOOL WINAPI CALLBACK wpPlacement(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
 	static LPRECT pr = NULL;
+	static BOOL bXP;
 	switch(msg)
 	{
 		case WM_INITDIALOG:
 			pr = (LPRECT)lp;
 			if(!pr)
 				EndDialog(hwnd, 0);
+			bXP = isWinXP();
 			MoveWindow(hwnd, pr->left, pr->top, pr->right, pr->bottom, FALSE);
 			break;
 		case WM_COMMAND:
@@ -512,8 +514,16 @@ BOOL WINAPI CALLBACK wpPlacement(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 				MINMAXINFO * pmm = (MINMAXINFO *)lp;
 				if(!pmm)
 					break;
-				pmm->ptMinTrackSize.x = 565;
-				pmm->ptMinTrackSize.y = 349;
+				if( bXP )
+				{
+					pmm->ptMinTrackSize.x = OW_XP_MINWIDTH;
+					pmm->ptMinTrackSize.y = OW_XP_MINHEIGHT;
+				}
+				else
+				{
+					pmm->ptMinTrackSize.x = OW_2K_MINWIDTH;
+					pmm->ptMinTrackSize.y = OW_2K_MINHEIGHT;
+				}
 			}
 			break;
 		case WM_CLOSE:

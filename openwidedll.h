@@ -49,13 +49,20 @@ typedef struct OWSharedData
 
 #define PACKVERSION(major,minor) MAKELONG(minor,major)
 
-#define	OW_MATCH_STYLE			0x96CC20C4
+#define	OW_MATCH_STYLE			0x82CC20C4
 #define	OW_MATCH_EXSTYLE		0x00010501
 
 #define	OW_SHARED_FILE_MAPPING	("openwidedll_shared_memfile")
 #define	OW_MUTEX_NAME			("openwidedll_mem_mutex")
 #define	OW_PROP_NAME			("openwidedll_window_property")
 #define	OW_OVERLAY_CLASS		("openwidedll_overlay_window_class")
+
+#define	OW_2K_MINWIDTH			565
+#define	OW_2K_MINHEIGHT			349
+
+#define	OW_XP_MINWIDTH			563
+#define	OW_XP_MINHEIGHT			419
+
 // functions from file C:\Data\Code\C\openwide\openwidedll.c //
 int rmvHook(void);
 int setHook(HWND hwLB);

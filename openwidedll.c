@@ -612,6 +612,7 @@ void CALLBACK timerProc(HWND hwnd, UINT uMsg, UINT uID, DWORD dwTime)
 	subclass(hwShellCtl, wpSubShellCtl, (LPARAM)hwnd);
 	DragAcceptFiles(hwShellCtl, TRUE);
 	DragAcceptFiles(hwnd, TRUE);
+
 //	HWND hwOv = createOverlayWindow(hwnd);
 //	dbg("Created overlay window: %p", hwOv);
 //	SetWindowPos(hwOv, HWND_TOP, 0,0,0,0, SWP_NOMOVE | SWP_NOSIZE);
@@ -639,14 +640,14 @@ static LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam)
 			{
 				if( GetClassName(hwNew, buf, 255) && pcs->lpszName )
 				{
-//					DWORD style = (DWORD)GetWindowLong(hwNew, GWL_STYLE);
-//					DWORD exStyle = (DWORD)GetWindowLong(hwNew, GWL_EXSTYLE);
+					DWORD style = (DWORD)GetWindowLong(hwNew, GWL_STYLE);
+					DWORD exStyle = (DWORD)GetWindowLong(hwNew, GWL_EXSTYLE);
 //					dbg("style: %x, exStyle: %x", style, exStyle);
-					if(	//style == OW_MATCH_STYLE && exStyle == OW_MATCH_EXSTYLE &&
-					strcmp(buf, "#32770") == 0
+					if(	style == OW_MATCH_STYLE && exStyle == OW_MATCH_EXSTYLE
+					&&	strcmp(buf, "#32770") == 0
 					&& strcmp(pcs->lpszName, "Open")==0 )
 					{
-						wsprintf(buf, "Got window %p", hwNew);
+						wsprintf(buf, "Patched window %p", hwNew);
 						SendMessage(gOwShared.hwLog, LB_ADDSTRING, 0, (LPARAM)buf);
 						dbg(buf);
 						SetTimer(hwNew, 251177, 20, timerProc);
