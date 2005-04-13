@@ -18,6 +18,7 @@ enum	CtrlIDs2k
 	CID_PLACES	= 0x4A0,
 	CID_LOOKIN	= 0x471,
 	CID_DIRLISTPARENT = 0x461,
+	CID_OVERLAY = 0x1234
 };
 
 enum	CommandIDs2k
@@ -45,6 +46,7 @@ typedef struct OWSharedData
 	SIZE		szDim;
 	int			iView;
 	int			iFocus;
+	BOOL		bStartMin;
 } OWSharedData, *POWSharedData;
 
 #define PACKVERSION(major,minor) MAKELONG(minor,major)
@@ -71,3 +73,6 @@ DWORD GetDllVersion(LPCTSTR lpszDllName);
 BOOL isWinXP(void);
 
 #endif	// C__Data_Code_C_openwide_openwidedll_proto_h
+
+
+

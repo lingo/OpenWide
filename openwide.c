@@ -1,8 +1,17 @@
+#define	COBJMACROS
 #include	<windows.h>
+#include	<shlwapi.h>
+#include	<objbase.h>
+#include	<shobjidl.h>
+#include	<shlguid.h>
+#include	<shlobj.h>
 #include	<shellapi.h>
 #include	<stdio.h>
 #include	"openwidedll.h"
 #include	"openwide.h"
+
+
+int		setStartupApp(HWND hwnd, BOOL	bSet);
 
 int setHook(HWND hwLB);
 int rmvHook(void);
@@ -42,8 +51,7 @@ int		pix2DlgUnits(HWND hwnd, int pix, BOOL bHorz)
 const char * geterrmsg(void)
 {
 	static char szMsg[256];
-	FormatMessage(
-		FORMAT_MESSAGE_FROM_SYSTEM |
+	FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM |
 		FORMAT_MESSAGE_IGNORE_INSERTS,
 		NULL,
 		GetLastError(),
@@ -157,6 +165,7 @@ char *Prompt_File_Name(int iFlags, HWND hwOwner, const char *pszFilter, const ch
 					| OFN_FILEMUSTEXIST	// file names must be valid
 					| OFN_PATHMUSTEXIST // and paths too.
 					| OFN_HIDEREADONLY; // hide the read-only option
+		dbg("Address of OFN data is %p, structsize is %lu", &ofn, ofn.lStructSize);
 		if(!GetOpenFileName(&ofn))
 			return NULL;
 		return szFileName;
@@ -240,6 +249,46 @@ int regWriteDWORD(HKEY hkRoot, const char *szValue, DWORD dwData)
 	return (res == ERROR_SUCCESS);
 }
 
+/** Function source : C:\Data\Code\C\ExtassE\util.c */
+static int AddRem_TrayIcon(HICON hIcon, char *szTip, HWND hwnd, UINT uMsg, DWORD dwState, DWORD dwMode){
+
+	NOTIFYICONDATA nid;
+
+	memset(&nid, 0, sizeof(NOTIFYICONDATA));
+	nid.cbSize = sizeof(NOTIFYICONDATA);
+	nid.hWnd = hwnd;
+	nid.uFlags =  NIF_MESSAGE | (hIcon ? NIF_ICON : 0) | (szTip ? NIF_TIP : 0);
+	nid.hIcon = hIcon;
+	nid.uCallbackMessage = uMsg;
+
+	if( szTip )
+	{
+		strncpy(nid.szTip, szTip, 63);
+		nid.szTip[63] = 0;
+	}
+
+	//nid.dwState = dwState;
+	return (Shell_NotifyIcon(dwMode, &nid) != 0);
+}
+
+/* Copied by pro2 : (c)2004 Luke Hudson */
+/** Function source : C:\Data\Code\C\ExtassE\util.c */
+int Add_TrayIcon(HICON hIcon, char *szTip, HWND hwnd, UINT uMsg, DWORD dwState){
+	return AddRem_TrayIcon(hIcon, szTip, hwnd, uMsg, dwState, NIM_ADD);
+}
+
+/** Function source : C:\Data\Code\C\ExtassE\util.c */
+void EndTrayOperation(void)
+{
+	NOTIFYICONDATA nid = {0};
+	nid.cbSize = sizeof(NOTIFYICONDATA);
+	Shell_NotifyIcon(NIM_SETFOCUS, &nid);
+}
+
+/** Function source : C:\Data\Code\C\ExtassE\util.c */
+int Rem_TrayIcon(HWND hwnd, UINT uMsg, DWORD dwState){
+	return AddRem_TrayIcon(NULL, NULL, hwnd, uMsg, dwState, NIM_DELETE);
+}
 
 
 int initSharedMem(HWND hwnd)
@@ -377,6 +426,8 @@ int	doApply(HWND hwnd)
 		if( v >= 0 && v < V_MAX )
 			gPowData->iView = v;
 	}
+	gPowData->bStartMin = IsDlgButtonChecked(hwnd, IDC_STARTMIN) == BST_CHECKED;
+	BOOL bWinStart = IsDlgButtonChecked(hwnd, IDC_WSTARTUP) == BST_CHECKED;
 
 	HKEY	hk = regCreateKey(HKEY_CURRENT_USER,  OW_REGKEY_NAME);
 	if( hk )
@@ -388,6 +439,8 @@ int	doApply(HWND hwnd)
 
 	if( ghMutex )
 		ReleaseMutex(ghMutex);
+
+	setStartupApp(hwnd, bWinStart);
 	return 1;
 }
 
@@ -429,12 +482,139 @@ void	fillViewCB(HWND hwnd, UINT uID)
 	SendMessage(hwCB, CB_RESETCONTENT, 0,0);
 	cbAddString(hwCB, "Large Icons", V_LGICONS);
 	if( isWinXP() )
-		cbAddString(hwCB, "Tiles", V_TILES);
+	cbAddString(hwCB, "Tiles", V_TILES);
 	else
-		cbAddString(hwCB, "Small Icons", V_SMICONS);
+	cbAddString(hwCB, "Small Icons", V_SMICONS);
 	cbAddString(hwCB, "List", V_LIST);
 	cbAddString(hwCB, "Details", V_DETAILS);
 	cbAddString(hwCB, "Thumbnails", V_THUMBS);
+}
+
+void	selectCBView(HWND hwnd, UINT uID, int iView)
+{
+	HWND hwCB = GetDlgItem(hwnd, uID);
+	if(!hwCB)
+		return;
+	int nItems = SendMessage(hwCB, CB_GETCOUNT, 0,0);
+	for(int i=0; i < nItems; i++)
+	{
+		int ivItem = (int)SendMessage(hwCB, CB_GETITEMDATA, i, 0);
+		if( ivItem == iView)
+		{
+			SendMessage(hwCB, CB_SETCURSEL, i, 0);
+			break;
+		}
+	}
+}
+
+// CreateLink - uses the Shell's IShellLink and IPersistFile interfaces
+//              to create and store a shortcut to the specified object.
+//
+// Returns the result of calling the member functions of the interfaces.
+//
+// Parameters:
+// lpszPathObj  - address of a buffer containing the path of the object.
+// lpszPathLink - address of a buffer containing the path where the
+//                Shell link is to be stored.
+// lpszDesc     - address of a buffer containing the description of the
+//                Shell link.
+
+HRESULT CreateLink(LPCSTR lpszPathObj, LPCSTR lpszPathLink, LPCSTR lpszDesc)
+{
+    HRESULT hres;
+    IShellLink* psl;
+
+    // Get a pointer to the IShellLink interface.
+    hres = CoCreateInstance(&CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER,
+                            &IID_IShellLink, (LPVOID*)&psl);
+    if (SUCCEEDED(hres))
+    {
+        IPersistFile* ppf;
+
+        // Set the path to the shortcut target and add the description.
+        psl->SetPath(lpszPathObj);
+        psl->SetDescription(lpszDesc);
+
+        // Query IShellLink for the IPersistFile interface for saving the
+        // shortcut in persistent storage.
+        hres = psl->QueryInterface(&IID_IPersistFile, (LPVOID*)&ppf);
+
+        if (SUCCEEDED(hres))
+        {
+            WCHAR wsz[MAX_PATH];
+
+            // Ensure that the string is Unicode.
+            MultiByteToWideChar(CP_ACP, 0, lpszPathLink, -1, wsz, MAX_PATH);
+
+            // TODO: Check return value from MultiByteWideChar to ensure success.
+            // Save the link by calling IPersistFile::Save.
+            hres = ppf->Save(wsz, TRUE);
+            ppf->Release();
+        }
+        psl->Release();
+    }
+    return hres;
+}
+
+
+
+/* Copied by pro2 : (c)2004 Luke Hudson */
+/** Function source : C:\Data\Code\C\Proto\util.c */
+BOOL fileExists (const char *path)
+{
+	int errCode;
+
+	if (GetFileAttributes (path) == 0xFFFFFFFF)
+	{
+		errCode = GetLastError ();
+		if (errCode == ERROR_FILE_NOT_FOUND
+				|| errCode == ERROR_PATH_NOT_FOUND)
+			return FALSE;
+		dbg ("fileExists? getLastError gives %d", errCode);
+	}
+	return TRUE;
+}
+
+
+BOOL	isStartupApp(HWND hwnd)
+{
+	static char szBuf[MAX_PATH+1];
+	HRESULT hRes = SHGetFolderPath(hwnd, CSIDL_STARTUP, NULL, SHGFP_TYPE_CURRENT, szBuf);
+	if( hRes == S_OK )
+	{
+		PathAppend(szBuf, "OpenWide.lnk");
+		return fileExists(szBuf);
+	}
+	return FALSE;
+}
+
+int		setStartupApp(HWND hwnd, BOOL	bSet)
+{
+	char szBuf[MAX_PATH+1], szModule[MAX_PATH+1];
+
+	if( !GetModuleFileName(NULL, szModule, MAX_PATH) )
+		return 0;
+	HRESULT hRes = SHGetFolderPath(hwnd, CSIDL_STARTUP, NULL, SHGFP_TYPE_CURRENT, szBuf);
+	if( hRes != S_OK || !PathAppend(szBuf, "OpenWide.lnk"))
+		return 0;
+	if( bSet )
+	{
+		hRes = CreateLink(szModule, szBuf, "OpenWide - control Open&Save dialogs...");
+		return hRes == S_OK;
+	}
+	else
+	{
+		int len = strlen(szBuf);
+		for(int i=MAX_PATH; i > len; i--)
+			szBuf[i] = 0;
+
+		SHFILEOPSTRUCT shlOp = {0};
+		shlOp.hwnd = hwnd;
+		shlOp.wFunc = FO_DELETE;
+		shlOp.pFrom = szBuf;
+		shlOp.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT;
+		return SHFileOperation(&shlOp) == S_OK;
+	}
 }
 
 int initWin(HWND hwnd)
@@ -452,10 +632,14 @@ int initWin(HWND hwnd)
 	if(!initSharedMem(ghwListBox))
 		return 0;
 
+	CheckDlgButton(hwnd, IDC_WSTARTUP, isStartupApp(hwnd));
 	CheckDlgButton(hwnd, IDC_LOG, BST_CHECKED);
 	fillViewCB(hwnd, IDCB_VIEW);
 	fillFocusCB(hwnd, IDCB_FOCUS);
 
+	BOOL bMinimize = FALSE;
+
+// wait for then lock shared data
 	if(ghMutex)
 	{
 		DWORD dwRes = WaitForSingleObject(ghMutex, 1000);
@@ -463,24 +647,43 @@ int initWin(HWND hwnd)
 			return 0;
 	}
 
-	SetDlgItemInt(hwnd, IDE_LEFT, gPowData->ptOrg.x, FALSE);
-	SetDlgItemInt(hwnd, IDE_TOP, gPowData->ptOrg.y, FALSE);
+	bMinimize = gPowData->bStartMin;
+
+	SetDlgItemInt(hwnd, IDE_LEFT, gPowData->ptOrg.x, TRUE);
+	SetDlgItemInt(hwnd, IDE_TOP, gPowData->ptOrg.y, TRUE);
 	SetDlgItemInt(hwnd, IDE_WIDTH, gPowData->szDim.cx, FALSE);
 	SetDlgItemInt(hwnd, IDE_HEIGHT, gPowData->szDim.cy, FALSE);
-	SendDlgItemMessage(hwnd, IDCB_VIEW, CB_SETCURSEL, gPowData->iView, 0);
+
+	selectCBView(hwnd, IDCB_VIEW, gPowData->iView);
 	SendDlgItemMessage(hwnd, IDCB_FOCUS, CB_SETCURSEL, gPowData->iFocus, 0);
+
+	CheckDlgButton(hwnd, IDC_STARTMIN, gPowData->bStartMin);
 
 	if( ghMutex )
 		ReleaseMutex(ghMutex);
+/// released shared data
+
 	EnableWindow( GetDlgItem(hwnd, IDOK), FALSE);
+	ShowWindow(GetDlgItem(hwnd, IDC_LOG), FALSE);
+	ShowWindow(GetDlgItem(hwnd, IDG_LOG), FALSE);
+	ShowWindow(GetDlgItem(hwnd, IDL_LOG), FALSE);
 
 	RECT rc,rw;
 	GetWindowRect( GetDlgItem(hwnd, IDC_LOG), &rc);
 	GetWindowRect( hwnd, &rw);
 	SetWindowPos(hwnd, NULL, 0,0, RCWIDTH(rw), rc.top+dlgUnits2Pix(hwnd, 6, FALSE) - rw.top, SWP_NOMOVE | SWP_NOZORDER);
-//	ShowWindow( GetDlgItem(hwnd, IDG_LOG), SW_HIDE);
-//	ShowWindow( GetDlgItem(hwnd, IDL_LOG), SW_HIDE);
 
+	if( bMinimize )
+	{
+		SendMessage(hwnd, WM_SYSCOMMAND, SC_MINIMIZE, 0);
+		SetFocus(NULL);
+		EndTrayOperation();
+	}
+	else
+	{
+		SetFocus(GetDlgItem(hwnd, IDB_SETPLACEMENT));
+		ShowWindow(hwnd, SW_SHOWNORMAL);
+	}
 	return 1;
 }
 
@@ -548,6 +751,19 @@ int	getDlgItemRect(HWND hwnd, UINT uID, LPRECT pr)
 	return 1;
 }
 
+void	setChanged(HWND hwnd, BOOL bChanged)
+{
+	gbChanged = bChanged;
+	EnableWindow( GetDlgItem(hwnd, IDOK), bChanged);
+	if( !bChanged )
+		SetFocus( GetDlgItem(hwnd, IDB_TEST) );
+}
+
+BOOL	isChanged(void)
+{
+	return gbChanged;
+}
+
 static void onCommand(HWND hwnd, WPARAM wp, LPARAM lp)
 {
 	switch(LOWORD(wp))
@@ -555,20 +771,14 @@ static void onCommand(HWND hwnd, WPARAM wp, LPARAM lp)
 		case IDCB_VIEW:
 		case IDCB_FOCUS:
 			if( HIWORD(wp) == CBN_SELCHANGE )
-			{
-				gbChanged = TRUE;
-				EnableWindow( GetDlgItem(hwnd, IDOK), TRUE);
-			}
+				setChanged(hwnd, TRUE);
 			break;
 		case IDE_LEFT:
 		case IDE_TOP:
 		case IDE_WIDTH:
 		case IDE_HEIGHT:
 			if( HIWORD(wp) == EN_CHANGE )
-			{
-				gbChanged = TRUE;
-				EnableWindow( GetDlgItem(hwnd, IDOK), TRUE);
-			}
+				setChanged(hwnd, TRUE);
 			break;
 		case IDB_QUIT:
 			DestroyWindow(hwnd);
@@ -587,10 +797,13 @@ static void onCommand(HWND hwnd, WPARAM wp, LPARAM lp)
 					SetDlgItemInt(hwnd, IDE_TOP, r.top, TRUE);
 					SetDlgItemInt(hwnd, IDE_WIDTH, r.right - r.left, TRUE);
 					SetDlgItemInt(hwnd, IDE_HEIGHT, r.bottom - r.top, TRUE);
-					gbChanged = TRUE;
-					EnableWindow( GetDlgItem(hwnd, IDOK), TRUE);
+					setChanged(hwnd, TRUE);
 				}
 			}
+			break;
+		case IDC_WSTARTUP:
+		case IDC_STARTMIN:
+			setChanged(hwnd, HIWORD(wp)==BN_CLICKED);
 			break;
 		case IDC_LOG:
 			{
@@ -614,10 +827,7 @@ static void onCommand(HWND hwnd, WPARAM wp, LPARAM lp)
 			break;
 		case IDOK:
 			if( doApply(hwnd) )
-			{
-				gbChanged = FALSE;
-				EnableWindow( GetDlgItem(hwnd, IDOK), FALSE);
-			}
+				setChanged(hwnd, FALSE);
 			break;
 		case IDB_TEST:
 //			rmvHook();
@@ -627,53 +837,11 @@ static void onCommand(HWND hwnd, WPARAM wp, LPARAM lp)
 	}
 }
 
-/** Function source : C:\Data\Code\C\ExtassE\util.c */
-static int AddRem_TrayIcon(HICON hIcon, char *szTip, HWND hwnd, UINT uMsg, DWORD dwState, DWORD dwMode){
-
-	NOTIFYICONDATA nid;
-
-	memset(&nid, 0, sizeof(NOTIFYICONDATA));
-	nid.cbSize = sizeof(NOTIFYICONDATA);
-	nid.hWnd = hwnd;
-	nid.uFlags =  NIF_MESSAGE | (hIcon ? NIF_ICON : 0) | (szTip ? NIF_TIP : 0);
-	nid.hIcon = hIcon;
-	nid.uCallbackMessage = uMsg;
-
-	if( szTip )
-	{
-		strncpy(nid.szTip, szTip, 63);
-		nid.szTip[63] = 0;
-	}
-
-	//nid.dwState = dwState;
-	return (Shell_NotifyIcon(dwMode, &nid) != 0);
-}
-
-/* Copied by pro2 : (c)2004 Luke Hudson */
-/** Function source : C:\Data\Code\C\ExtassE\util.c */
-int Add_TrayIcon(HICON hIcon, char *szTip, HWND hwnd, UINT uMsg, DWORD dwState){
-	return AddRem_TrayIcon(hIcon, szTip, hwnd, uMsg, dwState, NIM_ADD);
-}
-
-/** Function source : C:\Data\Code\C\ExtassE\util.c */
-void EndTrayOperation(void)
-{
-	NOTIFYICONDATA nid = {0};
-	nid.cbSize = sizeof(NOTIFYICONDATA);
-	Shell_NotifyIcon(NIM_SETFOCUS, &nid);
-}
-
-/** Function source : C:\Data\Code\C\ExtassE\util.c */
-int Rem_TrayIcon(HWND hwnd, UINT uMsg, DWORD dwState){
-	return AddRem_TrayIcon(NULL, NULL, hwnd, uMsg, dwState, NIM_DELETE);
-}
-
-
 
 int		addTrayIcon(HWND hwnd)
 {
 	HICON hIcon = (HICON)LoadImage(hInst, MAKEINTRESOURCE(IDI_TRAY), IMAGE_ICON, 16,16, LR_SHARED | LR_VGACOLOR);
-	return Add_TrayIcon( hIcon, "OpenWide\r\nDouble-click to show...", hwnd, WM_TRAYICON, 0);
+	return Add_TrayIcon( hIcon, "OpenWide\r\nLeft-Click to show...", hwnd, WM_TRAYICON, 0);
 }
 
 void	remTrayIcon(HWND hwnd)
@@ -690,11 +858,11 @@ BOOL WINAPI CALLBACK wpMain(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 				DestroyWindow(hwnd);
 			else if( !setHook( hwnd ) )
 				Warn( "Failed to set hook: %s", geterrmsg() );
-			break;
+			return FALSE;
 		case WM_TRAYICON:
 			switch(lp)
 			{
-				case WM_LBUTTONDBLCLK:
+				case WM_LBUTTONUP:
 					ShowWindow(hwnd, SW_SHOWNORMAL);
 					EnableWindow(hwnd, TRUE);
 					remTrayIcon(hwnd);
@@ -752,7 +920,11 @@ int createWin(void)
 
 int init(void)
 {
-	if( !createWin() ) return 0;
+	HRESULT hRes = CoInitialize(NULL);
+	if( hRes != S_OK && hRes != S_FALSE )
+		return 0;
+	if( !createWin() )
+		return 0;
 	return 1;
 }
 
@@ -764,6 +936,7 @@ void shutdown(void)
 		DestroyWindow(ghwMain);
 		ghwMain = NULL;
 	}
+	CoUninitialize();
 }
 
 
@@ -777,13 +950,14 @@ int WINAPI WinMain(HINSTANCE hi, HINSTANCE hiPrv, LPSTR fakeCmdLine, int iShow)
 		HWND hw = FindWindowEx(NULL, NULL, WC_DIALOG, "Open Wide!");
 		if(hw)
 		{
-			ShowWindow(hw, SW_SHOWNORMAL);
+			SendMessage(hw, WM_TRAYICON, 0, WM_LBUTTONUP);
+			FlashWindow(hw, TRUE);
 			SetForegroundWindow(hw);
 		}
 		return 0;
 	}
 	hInst = hi;
-	if(!init())
+	if( !init() )
 	{
 		shutdown();
 		return 0;
@@ -804,4 +978,5 @@ int WINAPI WinMain(HINSTANCE hi, HINSTANCE hiPrv, LPSTR fakeCmdLine, int iShow)
 	shutdown();
 	return 0;
 }
+
 
