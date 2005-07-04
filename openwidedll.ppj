@@ -13,7 +13,7 @@ CC = pocc.exe#
 AS = ml.exe#
 RC = porc.exe#
 LINK = polink.exe#
-CCFLAGS = -Tx86-coff -Zi -W1 -Gd -Ze -DDEBUG -D_WIN32_IE=0x0600 #
+CCFLAGS =  -Tx86-coff -Zi -MT -W1 -Gd -Ze -DDEBUG -D_WIN32_IE=0x0600 #
 ASFLAGS = -Zi -W0 -Cu -c -nologo -coff#
 RCFLAGS = -L0x1409 #
 LINKFLAGS = -debug -debugtype:both -subsystem:windows -machine:ix86 -map -dll kernel32.lib user32.lib gdi32.lib comctl32.lib comdlg32.lib advapi32.lib delayimp.lib shlwapi.lib shell32.lib#
