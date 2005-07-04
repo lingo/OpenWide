@@ -1,5 +1,6 @@
 /* --- The following code comes from c:\lcc\lib\wizard\dll.tpl. */
 #include <windows.h>
+#include <commctrl.h>
 #include	<shlwapi.h>
 #include	<shellapi.h>
 #include	<stdarg.h>
@@ -8,6 +9,12 @@
 #include	"openwidedll.h"
 #include	"openwide.h"
 //#include	"dbgwm.h"
+
+#ifdef __LCC__
+#define DLLPROC	LibMain
+#else
+#define DLLPROC	DllMain
+#endif
 
 static HINSTANCE ghInst = NULL;
 
@@ -41,7 +48,7 @@ DWORD DLLEXPORT GetDllVersion(LPCTSTR lpszDllName);
 int getSharedData(void);
 int initSharedMem(void);
 BOOL DLLEXPORT isWinXP(void);
-BOOL WINAPI DLLEXPORT LibMain(HINSTANCE hDLLInst, DWORD fdwReason, LPVOID lpvReserved);
+BOOL DLLEXPORT WINAPI DLLPROC(HINSTANCE hDLLInst, DWORD fdwReason, LPVOID lpvReserved);
 void releaseSharedMem(void);
 int DLLEXPORT rmvHook(void);
 int DLLEXPORT setHook(HWND hwLB);
@@ -68,7 +75,7 @@ LRESULT CALLBACK WINAPI wpOverlay(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
                 to initialize and should be unloaded immediately.
  Errors:
 ------------------------------------------------------------------------*/
-BOOL WINAPI DLLEXPORT LibMain(HINSTANCE hDLLInst, DWORD fdwReason, LPVOID lpvReserved)
+BOOL DLLEXPORT WINAPI DLLPROC(HINSTANCE hDLLInst, DWORD fdwReason, LPVOID lpvReserved)
 {
     switch (fdwReason)
     {

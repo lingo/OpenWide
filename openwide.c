@@ -1,4 +1,3 @@
-#define	COBJMACROS
 #include	<windows.h>
 #include	<shlwapi.h>
 #include	<objbase.h>
@@ -12,9 +11,8 @@
 
 
 int		setStartupApp(HWND hwnd, BOOL	bSet);
-
-int setHook(HWND hwLB);
-int rmvHook(void);
+int 	setHook(HWND hwLB);
+int 	rmvHook(void);
 
 #define	OW_REGKEY_NAME	("Software\\HiveMind\\OpenWide")
 
@@ -433,7 +431,7 @@ int	doApply(HWND hwnd)
 	if( hk )
 	{
 		regWriteDWORD(hk, NULL, sizeof(OWSharedData));
-		regWriteBinaryData(hk, "OWData", gPowData, sizeof(OWSharedData));
+		regWriteBinaryData(hk, "OWData", (byte *)gPowData, sizeof(OWSharedData));
 		regCloseKey(hk);
 	}
 
@@ -532,12 +530,12 @@ HRESULT CreateLink(LPCSTR lpszPathObj, LPCSTR lpszPathLink, LPCSTR lpszDesc)
         IPersistFile* ppf;
 
         // Set the path to the shortcut target and add the description.
-        psl->SetPath(lpszPathObj);
-        psl->SetDescription(lpszDesc);
+        psl->lpVtbl->SetPath(psl, lpszPathObj);
+        psl->lpVtbl->SetDescription(psl, lpszDesc);
 
         // Query IShellLink for the IPersistFile interface for saving the
         // shortcut in persistent storage.
-        hres = psl->QueryInterface(&IID_IPersistFile, (LPVOID*)&ppf);
+        hres = psl->lpVtbl->QueryInterface(psl, &IID_IPersistFile, (LPVOID*)&ppf);
 
         if (SUCCEEDED(hres))
         {
@@ -548,10 +546,10 @@ HRESULT CreateLink(LPCSTR lpszPathObj, LPCSTR lpszPathLink, LPCSTR lpszDesc)
 
             // TODO: Check return value from MultiByteWideChar to ensure success.
             // Save the link by calling IPersistFile::Save.
-            hres = ppf->Save(wsz, TRUE);
-            ppf->Release();
+            hres = ppf->lpVtbl->Save(ppf, wsz, TRUE);
+            ppf->lpVtbl->Release(ppf);
         }
-        psl->Release();
+        psl->lpVtbl->Release(psl);
     }
     return hres;
 }
@@ -918,7 +916,7 @@ int createWin(void)
 	return (ghwMain!=NULL);
 }
 
-int init(void)
+int ow_init(void)
 {
 	HRESULT hRes = CoInitialize(NULL);
 	if( hRes != S_OK && hRes != S_FALSE )
@@ -929,7 +927,7 @@ int init(void)
 }
 
 
-void shutdown(void)
+void ow_shutdown(void)
 {
 	if(ghwMain)
 	{
@@ -957,9 +955,9 @@ int WINAPI WinMain(HINSTANCE hi, HINSTANCE hiPrv, LPSTR fakeCmdLine, int iShow)
 		return 0;
 	}
 	hInst = hi;
-	if( !init() )
+	if( !ow_init() )
 	{
-		shutdown();
+		ow_shutdown();
 		return 0;
 	}
 
@@ -975,7 +973,7 @@ int WINAPI WinMain(HINSTANCE hi, HINSTANCE hiPrv, LPSTR fakeCmdLine, int iShow)
 		}
 	}
 
-	shutdown();
+	ow_shutdown();
 	return 0;
 }
 
