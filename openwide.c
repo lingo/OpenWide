@@ -1,30 +1,33 @@
-#define	COBJMACROS
 #include	<windows.h>
 #include	<shlwapi.h>
-#include	<objbase.h>
-#include	<shobjidl.h>
-#include	<shlguid.h>
-#include	<shlobj.h>
 #include	<shellapi.h>
 #include	<stdio.h>
 #include	"openwidedll.h"
 #include	"openwide.h"
+#include	"winutil.h"
 
+//#include	<shlguid.h>
+#include	<shlobj.h>
 
-int		setStartupApp(HWND hwnd, BOOL	bSet);
+#pragma lib "shell32.lib"
+#pragma lib "shlwapi.lib"
 
-int setHook(HWND hwLB);
-int rmvHook(void);
+////////////////////////////////////////////////////////////////////////////////
+//  Defines
 
 #define	OW_REGKEY_NAME	("Software\\HiveMind\\OpenWide")
+#define	SETDLGRESULT(hw, x)	SetWindowLong((hw), DWL_MSGRESULT, (LONG)(x))
 
 #define		RCWIDTH(r)	((r).right - (r).left + 1)
 #define		RCHEIGHT(r)	((r).bottom - (r).top + 1)
 
 #define		WM_TRAYICON		(WM_APP)
 
+////////////////////////////////////////////////////////////////////////////////
+//  Globals
+
 HWND		ghwMain = NULL;
-HINSTANCE	hInst = NULL;
+HINSTANCE	ghInstance = NULL;
 HWND		ghwListBox = NULL;
 
 static POWSharedData 	gPowData = NULL;
@@ -32,268 +35,350 @@ static HANDLE			ghSharedMem =  NULL;
 static HANDLE			ghMutex = NULL;
 static BOOL				gbChanged = FALSE;
 
-int		dlgUnits2Pix(HWND hwnd, int units, BOOL bHorz)
-{
-	RECT r;
-	SetRect(&r, 0,0,units,units);
-	MapDialogRect(hwnd, &r);
-	return (bHorz) ? r.right : r.bottom;
-}
-
-int		pix2DlgUnits(HWND hwnd, int pix, BOOL bHorz)
-{
-	RECT r;
-	SetRect(&r, 0,0,10,10);
-	MapDialogRect(hwnd, &r);
-	return (bHorz) ? (pix / r.right) : (pix / r.bottom);
-}
-
-const char * geterrmsg(void)
-{
-	static char szMsg[256];
-	FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM |
-		FORMAT_MESSAGE_IGNORE_INSERTS,
-		NULL,
-		GetLastError(),
-		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
-		(LPTSTR) szMsg,
-		255,
-		NULL
-	);
-	int len = strlen(szMsg) - 1;
-	if(len < 0) return NULL;
-	while( szMsg[len] == '\r' || szMsg[len] == '\n'){
-		szMsg[len--] = 0;
-		if(len < 0) break;
-	}
-	return szMsg;
-}
-
-/* Copied from Pro2
- * Function source : C:\Code\lcc\Proto\util.c */
-void Error(char *szError, ...)
-{
-	char		szBuff[256];
-	va_list		vl;
-	va_start(vl, szError);
-    _vsnprintf(szBuff, 256, szError, vl);	// print error message to string
-	OutputDebugString(szBuff);
-	MessageBox(NULL, szBuff, "Error", MB_OK); // show message
-	va_end(vl);
-	exit(-1);
-}
-
-/* Copied from Pro2
- * Function source : C:\Code\lcc\Proto\util.c */
-void Warn(char *szError, ...)
-{
-	char		szBuff[256];
-	va_list		vl;
-	va_start(vl, szError);
-    _vsnprintf(szBuff, 256, szError, vl);	// print error message to string
-	OutputDebugString(szBuff);
-	MessageBox(NULL, szBuff, "Error", MB_OK); // show message
-	va_end(vl);
-}
-
-void dbg(char *szError, ...)
-{
-	char		szBuff[256];
-	va_list		vl;
-	va_start(vl, szError);
-    _vsnprintf(szBuff, 256, szError, vl);	// print error message to string
-	OutputDebugString(szBuff);
-	va_end(vl);
-}
-
-UINT APIENTRY OFNHookProcOldStyle(
-    HWND hdlg,	// handle to the dialog box window
-    UINT uiMsg,	// message identifier
-    WPARAM wParam,	// message parameter
-    LPARAM lParam 	// message parameter
-)
-{
-	return FALSE;
-}
-
+////////////////////////////////////////////////////////////////////////////////
+//  Prototypes
 
 /* Copied by pro2 : (c)2004 Luke Hudson */
-/** Function source : C:\Data\Code\C\resh\resh.c */
-char *Prompt_File_Name(int iFlags, HWND hwOwner, const char *pszFilter, const char *pszTitle)
+int  addTrayIcon(HWND hwnd);
+int  cbAddString(HWND hwCB, const char *szStr, LPARAM lpData);
+int createWin(void);
+int doApply(HWND hwnd);
+void fillFocusCB(HWND hwnd, UINT uID);
+void fillViewCB(HWND hwnd, UINT uID);
+int initApp(void);
+int initSharedMem(HWND hwnd);
+int initWin(HWND hwnd);
+BOOL isChanged(void);
+BOOL isStartupApp(HWND hwnd);
+int lockSharedMem(void);
+static void onCommand(HWND hwnd, WPARAM wp, LPARAM lp);
+void releaseSharedMem(void);
+void remTrayIcon(HWND hwnd);
+void selectCBView(HWND hwnd, UINT uID, int iView);
+int  setStartupApp(HWND hwnd, BOOL bSet);
+void shutdownApp(void);
+int unlockSharedMem(void);
+int WINAPI WinMain(HINSTANCE hi, HINSTANCE hiPrv, LPSTR fakeCmdLine, int iShow);
+BOOL WINAPI CALLBACK wpMain(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
+static BOOL CALLBACK wpPageFolders(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
+static BOOL CALLBACK wpPagePrefs(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
+static BOOL CALLBACK wpPageWinSettings(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
+BOOL WINAPI CALLBACK wpPlacement(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
+BOOL WINAPI CALLBACK wpPlacement(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
+
+////////////////////////////////////////////////////////////////////////////////
+//  Functions
+
+void	setChanged(HWND hwnd, BOOL bChanged)
 {
-	static char szFileName[MAX_PATH];			// store selected file
-	char szDefFilter[] = "All Files\0*.*\0\0";	// default filter
-	OPENFILENAME ofn;
+	gbChanged = bChanged;
+	EnableWindow( GetDlgItem(hwnd, IDOK), bChanged);
+	if( !bChanged )
+		SetFocus( GetDlgItem(hwnd, IDB_TEST) );
+}
 
-	ZeroMemory(&ofn, sizeof(ofn));
-	ofn.lStructSize = sizeof(ofn);
+BOOL	isChanged(void)
+{
+	return gbChanged;
+}
 
-	szFileName[0] = 0; // mark the file name buffer as empty;
 
-	ofn.hwndOwner = hwOwner;
-	// If a filter is supplied, use it.  Otherwise, use default.
-	ofn.lpstrFilter = (pszFilter) ? pszFilter : szDefFilter;
-	ofn.lpstrFile = szFileName;		// where to store filename
-	ofn.nMaxFile = MAX_PATH;		// length of filename buffer
-	ofn.lpstrTitle = pszTitle;		// title if supplied
-
-	if(iFlags == 1)
+static BOOL CALLBACK wpPageWinSettings(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
+{
+	switch (msg)
 	{
-		ofn.Flags = OFN_EXPLORER	// use new features
-					| OFN_CREATEPROMPT	// create files if user wishes
-					| OFN_OVERWRITEPROMPT
-					| OFN_PATHMUSTEXIST // what it says
-					| OFN_HIDEREADONLY; // hide the read-only option
-		if(pszFilter)
+		case WM_INITDIALOG:
+			if( !initWin(hwnd) )
+				SendMessage(hwnd, PSM_PRESSBUTTON, PSBTN_CANCEL, 0);
+			break;
+		case WM_COMMAND:
+			switch(LOWORD(wp))
+			{
+				case IDCB_VIEW:
+				case IDCB_FOCUS:
+					if( HIWORD(wp) == CBN_SELCHANGE )
+						setChanged(hwnd, TRUE);
+					break;
+				case IDE_LEFT:
+				case IDE_TOP:
+				case IDE_WIDTH:
+				case IDE_HEIGHT:
+					if( HIWORD(wp) == EN_CHANGE )
+						setChanged(hwnd, TRUE);
+					break;
+				case IDB_QUIT:
+					//DestroyWindow(hwnd);
+					break;
+				case IDB_SETPLACEMENT:
+					{
+						RECT r;
+						r.left = GetDlgItemInt(hwnd, IDE_LEFT, NULL, TRUE);
+						r.top = GetDlgItemInt(hwnd, IDE_TOP, NULL, TRUE);
+						r.right = max( GetDlgItemInt(hwnd, IDE_WIDTH, NULL, FALSE), 100 );
+						r.bottom = max( GetDlgItemInt(hwnd, IDE_HEIGHT, NULL, FALSE), 100 );
+
+						if( DialogBoxParam(ghInstance, MAKEINTRESOURCE(IDD_PLACEMENT), hwnd, wpPlacement, (LPARAM)&r) )
+						{
+							SetDlgItemInt(hwnd, IDE_LEFT, r.left, TRUE);
+							SetDlgItemInt(hwnd, IDE_TOP, r.top, TRUE);
+							SetDlgItemInt(hwnd, IDE_WIDTH, r.right - r.left, TRUE);
+							SetDlgItemInt(hwnd, IDE_HEIGHT, r.bottom - r.top, TRUE);
+							setChanged(hwnd, TRUE);
+						}
+					}
+					break;
+				case IDB_TEST:
+		//			rmvHook();
+					//Prompt_File_Name(0, hwnd, NULL, NULL);
+		//			setHook(hwnd);
+					propSheet(hwnd, "Testing", NULL, 3, IDD_WINSETTINGS, wpPageWinSettings, IDD_FOLDERS, wpPageFolders, IDD_PREFS, wpPagePrefs);
+					break;
+			}
+			break;
+		case WM_NOTIFY:
+			{
+				LPNMHDR pnh = (LPNMHDR)lp;
+				dbg("%s, WM_NOTIFY from %p, %d", __func__, pnh->hwndFrom, pnh->idFrom);
+//				if( pnh->hwndFrom == hwPropSheet )
+//				{
+					switch(pnh->code)
+					{
+						case PSN_SETACTIVE:
+							SETDLGRESULT(hwnd, FALSE);
+							return FALSE;
+						case PSN_APPLY:
+							{
+								SETDLGRESULT(hwnd, PSNRET_NOERROR);
+								return TRUE;
+							}
+							break;
+					}
+//				}
+			}
+			break;
+		case WM_DESTROY:
+			break;
+		case WM_CLOSE:
+			break;
+	}
+	return 0;
+}
+
+static BOOL CALLBACK wpPageFolders(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
+{
+	switch (msg)
+	{
+		case WM_INITDIALOG:
+			break;
+		case WM_COMMAND:
+/*			switch (LOWORD(wp))
+			{
+			}
+			break;*/
+			break;
+		case WM_NOTIFY:
+			{
+				LPNMHDR pnh = (LPNMHDR)lp;
+				dbg("%s, WM_NOTIFY from %p, %d", __func__, pnh->hwndFrom, pnh->idFrom);
+//				if( pnh->hwndFrom == hwPropSheet )
+//				{
+					switch(pnh->code)
+					{
+						case PSN_SETACTIVE:
+							SETDLGRESULT(hwnd, FALSE);
+							return FALSE;
+						case PSN_APPLY:
+							{
+								SETDLGRESULT(hwnd, PSNRET_NOERROR);
+								return TRUE;
+							}
+							break;
+					}
+//				}
+			}
+			break;
+		case WM_DESTROY:
+			break;
+		case WM_CLOSE:
+			break;
+	}
+	return 0;
+}
+
+static BOOL CALLBACK wpPagePrefs(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
+{
+	switch (msg)
+	{
+		case WM_INITDIALOG:
+			break;
+		case WM_COMMAND:
+			switch (LOWORD(wp))
+			{
+				case IDC_WSTARTUP:
+				case IDC_STARTMIN:
+					setChanged(hwnd, HIWORD(wp)==BN_CLICKED);
+					break;
+/*				case IDC_LOG:
+					{
+						RECT rw, rc;
+						GetWindowRect(hwnd, &rw);
+						if( IsWindowVisible(GetDlgItem(hwnd, IDG_LOG)) )
+						{
+							GetWindowRect( GetDlgItem(hwnd, IDC_LOG), &rc);
+							SetWindowPos(hwnd, NULL, 0,0, RCWIDTH(rw), rc.bottom+dlgUnits2Pix(hwnd, 6, FALSE) - rw.top, SWP_NOMOVE | SWP_NOZORDER);
+							ShowWindow( GetDlgItem(hwnd, IDG_LOG), SW_HIDE);
+							ShowWindow( GetDlgItem(hwnd, IDL_LOG), SW_HIDE);
+						}
+						else
+						{
+							GetWindowRect( GetDlgItem(hwnd, IDG_LOG), &rc);
+							SetWindowPos(hwnd, NULL, 0,0, RCWIDTH(rw), rc.bottom+dlgUnits2Pix(hwnd, 6, FALSE) - rw.top, SWP_NOMOVE | SWP_NOZORDER);
+							ShowWindow( GetDlgItem(hwnd, IDG_LOG), SW_SHOW);
+							ShowWindow( GetDlgItem(hwnd, IDL_LOG), SW_SHOW);
+						}
+					}
+					break;
+				case IDOK:
+					if( doApply(hwnd) )
+						setChanged(hwnd, FALSE);
+					break;*/
+			}
+			break;
+		case WM_NOTIFY:
+			{
+				LPNMHDR pnh = (LPNMHDR)lp;
+				dbg("%s WM_NOTIFY from %p, %d", __func__, pnh->hwndFrom, pnh->idFrom);
+//				if( pnh->hwndFrom == hwPropSheet )
+//				{
+					switch(pnh->code)
+					{
+						case PSN_SETACTIVE:
+							SETDLGRESULT(hwnd, FALSE);
+							return FALSE;
+						case PSN_APPLY:
+							{
+								SETDLGRESULT(hwnd, PSNRET_NOERROR);
+								return TRUE;
+							}
+							break;
+					}
+//				}
+			}
+			break;
+		case WM_DESTROY:
+			break;
+		case WM_CLOSE:
+			break;
+	}
+	return 0;
+}
+
+int initFavourites(POWSharedData powData)
+{
+	powData->pFaves = NULL;
+	powData->nFaves = 0;
+	powData->dwFaveSize = 0;
+	powData->hFavMap = NULL;
+	const char *szFile = getLocalPath("favourites.dat");
+
+	powData->hFavFile = CreateFile( szFile, FILE_ALL_ACCESS, 0, NULL, TRUNCATE_EXISTING, FILE_ATTRIBUTE_HIDDEN, NULL);
+	if( powData->hFavFile == INVALID_HANDLE_VALUE )
+		powData->hFavFile = CreateFile( szFile, FILE_ALL_ACCESS, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_HIDDEN, NULL);
+
+	dbg("%s, Opened favourite file \"%s\": got handle %p", __func__, szFile, powData->hFavFile);
+	if( powData->hFavFile != INVALID_HANDLE_VALUE )
+	{
+		powData->dwFaveSize = max( sizeof(FavLink), powData->dwFaveSize );
+		powData->hRootMap = CreateFileMapping(powData->hFavFile, NULL, 
+			PAGE_READWRITE, 0, powData->dwFaveSize, OW_FAVES_FILE_MAPPING);
+
+		if( powData->hRootMap && lockFaves(powData) )
 		{
-			int i;
-			for(i=0; pszFilter[i]!=0; i++)
-				;
-			i++;
-			char *sp= strchr(&pszFilter[i], '.');
-			if(sp)	ofn.lpstrDefExt = sp+1;
+			HKEY	hk = regOpenKey(HKEY_CURRENT_USER,  OW_REGKEY_NAME);
+			if( hk )
+			{
+				BOOL bOK;
+				powData->nFaves = 0;
+
+				int nFaves = regReadDWORD(hk, "NumFavourites", &bOK);
+				dbg("%s, registry says there are %d faves", __func__, nFaves);
+				if( !bOK )	
+					nFaves = 0;
+
+				char szName[128];
+				int nAdded = 0;
+				for(int i=0; i < nFaves; i++ )
+				{
+					wsprintf(szName, "Favourite%02d", i);
+					char *szFav = regReadSZ(hk, szName);
+					if(szFav)
+					{
+						dbg("%s, %s was '%s'", __func__, szName, szFav);
+						if( !faveExists(powData, szFav) )
+						{
+							if( newFav(powData, szFav) )
+								nAdded++;
+							else
+								dbg("%s, error creating new favourite '%s'", __func__, szFav);
+						}
+						free(szFav);
+					}
+					else
+						dbg("%s, failed to read fave: '%s'", __func__, szName);
+				}
+				dbg("%s, added %d faves okay", __func__, nAdded);
+				//powData->nFaves = nAdded;
+				regCloseKey(hk);
+			}
 		}
-		if(!GetSaveFileName(&ofn))
-			return NULL;
-		return szFileName;
 	}
-	else
-	{
-//		ofn.lpfnHook = OFNHookProcOldStyle;
-//		ofn.Flags = OFN_ENABLEHOOK;
-		ofn.Flags = OFN_EXPLORER	// use new features
-					| OFN_FILEMUSTEXIST	// file names must be valid
-					| OFN_PATHMUSTEXIST // and paths too.
-					| OFN_HIDEREADONLY; // hide the read-only option
-		dbg("Address of OFN data is %p, structsize is %lu", &ofn, ofn.lStructSize);
-		if(!GetOpenFileName(&ofn))
-			return NULL;
-		return szFileName;
-	}
-	/*	MSG msg;
-	while (PeekMessage(&msg, hwOwner, WM_MOUSEFIRST, WM_MOUSELAST, PM_REMOVE));*/
+	return 1;
 }
 
-
-
-/* Copied by pro2 : (c)2004 Luke Hudson */
-/** Function source : C:\Data\Code\C\Proto\registry.c */
-void regCloseKey(HKEY hk)
+int		saveFaves2Registry(FavLink pFaves[], int nFaves)
 {
-	RegCloseKey(hk);
-}
-
-/** Function source : C:\Data\Code\C\Proto\registry.c */
-HKEY regCreateKey(HKEY hkParent, const char *szSubKey){
-	LONG res;
-	HKEY hk;
-	res = RegCreateKeyEx(hkParent, szSubKey, 0L, NULL, REG_OPTION_NON_VOLATILE,
-							KEY_READ | KEY_WRITE, NULL, &hk, NULL);
-	return ( res == ERROR_SUCCESS ) ? hk : NULL;
-}
-
-/** Function source : C:\Data\Code\C\Proto\registry.c */
-BYTE *regReadBinaryData(HKEY hkRoot, const char *szValueName){
-	DWORD dwType, dwSize = 0;
-	LONG res;
-	res = RegQueryValueEx(hkRoot, szValueName, NULL, &dwType, NULL, &dwSize);
-	if( res == ERROR_SUCCESS	&&	dwType == REG_BINARY	&&	dwSize > 0)
+	int nSaved = 0;
+	HKEY	hk = regCreateKey(HKEY_CURRENT_USER,  OW_REGKEY_NAME);
+	if( hk )
 	{
-		BYTE * buf = malloc(dwSize);
-		if(!buf)
-			return NULL;
-		res = RegQueryValueEx(hkRoot, szValueName, NULL, NULL, buf, &dwSize);
-		if( res == ERROR_SUCCESS )
-			return buf;
+		char szName[128];
+		for(int i=0; i < nFaves; i++)
+		{
+			wsprintf(szName, "Favourite%02d", i);
+			regWriteSZ(hk, szName, pFaves[i].szFav);
+			nSaved++;
+		}
+		regWriteDWORD(hk, "NumFavourites", nSaved);
+		regCloseKey(hk);
 	}
-	return NULL;
+	return nSaved;
 }
 
-/** Function source : C:\Data\Code\C\Proto\registry.c */
-int regWriteBinaryData(HKEY hkRoot, const char *szValue, BYTE *buf, int bufSize ){
-	LONG res;
-	res = RegSetValueEx(hkRoot, szValue, 0L, REG_BINARY, buf, bufSize);
-	return (res == ERROR_SUCCESS);
-}
 
-/* Copied by pro2 : (c)2004 Luke Hudson */
-/** Function source : C:\Data\Code\C\Proto\registry.c */
-DWORD regReadDWORD(HKEY hkRoot, const char *szValueName, int *pSuccess)
+void	shutdownFavourites(POWSharedData pow)
 {
-	LONG res;
-	DWORD dwType, dwSize = 0;
-	DWORD dword = 0L;
-
-	if( pSuccess )
-		*pSuccess = 0;
-	res = RegQueryValueEx(hkRoot, szValueName, NULL, &dwType, NULL, &dwSize);
-	if( res == ERROR_SUCCESS	&& (dwType == REG_DWORD || REG_DWORD_LITTLE_ENDIAN)		&& dwSize == sizeof(DWORD) )
+	unlockFaves(pow);
+	if( pow->hRootMap )
 	{
-		res = RegQueryValueEx(hkRoot, szValueName, NULL, NULL, (BYTE*)&dword, &dwSize);
-		if( res == ERROR_SUCCESS && pSuccess)
-			*pSuccess = 1;
+		if( lockFaves(pow) )
+		{
+			saveFaves2Registry(pow->pFaves, pow->nFaves);
+			unlockFaves(pow);
+		}
+		CloseHandle(pow->hRootMap);
+		pow->hRootMap = NULL;
 	}
-	return dword;
-}
-
-
-
-/* Copied by pro2 : (c)2004 Luke Hudson */
-/** Function source : C:\Data\Code\C\Proto\registry.c */
-int regWriteDWORD(HKEY hkRoot, const char *szValue, DWORD dwData)
-{
-	LONG res;
-	res = RegSetValueEx(hkRoot, (LPCTSTR)szValue, 0L, REG_DWORD,
-						(BYTE *)&dwData,
-						sizeof(dwData));
-	return (res == ERROR_SUCCESS);
-}
-
-/** Function source : C:\Data\Code\C\ExtassE\util.c */
-static int AddRem_TrayIcon(HICON hIcon, char *szTip, HWND hwnd, UINT uMsg, DWORD dwState, DWORD dwMode){
-
-	NOTIFYICONDATA nid;
-
-	memset(&nid, 0, sizeof(NOTIFYICONDATA));
-	nid.cbSize = sizeof(NOTIFYICONDATA);
-	nid.hWnd = hwnd;
-	nid.uFlags =  NIF_MESSAGE | (hIcon ? NIF_ICON : 0) | (szTip ? NIF_TIP : 0);
-	nid.hIcon = hIcon;
-	nid.uCallbackMessage = uMsg;
-
-	if( szTip )
+	if( pow->hFavFile != INVALID_HANDLE_VALUE )
 	{
-		strncpy(nid.szTip, szTip, 63);
-		nid.szTip[63] = 0;
+		CloseHandle(pow->hFavFile);
+		pow->hFavFile = INVALID_HANDLE_VALUE;
 	}
-
-	//nid.dwState = dwState;
-	return (Shell_NotifyIcon(dwMode, &nid) != 0);
 }
-
-/* Copied by pro2 : (c)2004 Luke Hudson */
-/** Function source : C:\Data\Code\C\ExtassE\util.c */
-int Add_TrayIcon(HICON hIcon, char *szTip, HWND hwnd, UINT uMsg, DWORD dwState){
-	return AddRem_TrayIcon(hIcon, szTip, hwnd, uMsg, dwState, NIM_ADD);
-}
-
-/** Function source : C:\Data\Code\C\ExtassE\util.c */
-void EndTrayOperation(void)
-{
-	NOTIFYICONDATA nid = {0};
-	nid.cbSize = sizeof(NOTIFYICONDATA);
-	Shell_NotifyIcon(NIM_SETFOCUS, &nid);
-}
-
-/** Function source : C:\Data\Code\C\ExtassE\util.c */
-int Rem_TrayIcon(HWND hwnd, UINT uMsg, DWORD dwState){
-	return AddRem_TrayIcon(NULL, NULL, hwnd, uMsg, dwState, NIM_DELETE);
-}
-
 
 int initSharedMem(HWND hwnd)
 {
-	int rVal = 0;
+	int rVal;
+	rVal = 0;
 	ghMutex = CreateMutex(NULL, TRUE, OW_MUTEX_NAME);
 	if( !ghMutex )
 		return 0;
@@ -328,7 +413,10 @@ int initSharedMem(HWND hwnd)
 			ZeroMemory(gPowData, sizeof(OWSharedData));
 			// if we succeeded in loading saved data, copy it back
 			if( pRData )
+			{
 				CopyMemory(gPowData, pRData, sizeof(OWSharedData));
+				//gPowData->iUserView = gPowData->iView;
+			}
 			else
 			{
 				// initialise the memory to useful values.
@@ -339,9 +427,10 @@ int initSharedMem(HWND hwnd)
 				gPowData->ptOrg.y = (h - 2*h/3)/2;
 				gPowData->szDim.cx = w/2;
 				gPowData->szDim.cy = 2*h/3;
-				gPowData->iView = V_DETAILS;
+				gPowData->iView = V_DETAILS; //gPowData->iUserView ..
 				gPowData->iFocus = F_DIRLIST;
 			}
+			initFavourites(gPowData);
 			gPowData->hwLog = hwnd;
 			rVal = 1;
 		}
@@ -354,26 +443,55 @@ int initSharedMem(HWND hwnd)
 	return rVal;
 }
 
+int lockSharedMem(void)
+{
+	if( ghMutex )
+	{
+		DWORD dwRes = WaitForSingleObject(ghMutex, INFINITE);
+		switch(dwRes)
+		{
+			case WAIT_OBJECT_0:
+				return 1;
+			case WAIT_ABANDONED:
+			default:
+				return 0;
+		}
+	}
+	else
+		return 0;
+}
+
+int	unlockSharedMem(void)
+{
+	if( !lockSharedMem() )
+		return 0;
+	if( ghMutex )
+		ReleaseMutex(ghMutex);
+	else
+		return 0;
+	return 1;
+}
 
 
 void releaseSharedMem(void)
 {
-	dbg("Waiting for mutex");
+	//dbg("%s, Waiting for mutex", __func__);
 	if( ghMutex )
 	{
 		DWORD dwRes = WaitForSingleObject(ghMutex, INFINITE);
 		if(dwRes != WAIT_OBJECT_0)
 		{
-			dbg("Failed to get ownership of mutex in releaseSharedMem!!!");
+			dbg("%s, Failed to get ownership of mutex in releaseSharedMem!!!", __func__);
 			return;
 		}
 	}
 
-	dbg("Releasing file mapping");
+	//dbg("%s, Releasing file mapping", __func__);
 	if( ghSharedMem )
 	{
 		if( gPowData );
 		{
+			shutdownFavourites(gPowData);
 			UnmapViewOfFile(gPowData);
 			gPowData = NULL;
 		}
@@ -386,19 +504,9 @@ void releaseSharedMem(void)
 int	doApply(HWND hwnd)
 {
 	DWORD dwRes;
-	if( ghMutex )
-	{
-		dwRes = WaitForSingleObject(ghMutex, INFINITE);
-		switch(dwRes)
-		{
-			case WAIT_OBJECT_0:
-				// okay, continue
-				break;
-			case WAIT_ABANDONED:
-			default:
-				return 0;
-		}
-	}
+	if( !lockSharedMem() )
+		return 0;
+	//dbg("%s, openwide.exe: Locked shared mem okay", __func__);
 	BOOL bOK;
 	int i = GetDlgItemInt(hwnd, IDE_LEFT, &bOK, TRUE);
 	if( bOK )
@@ -437,9 +545,8 @@ int	doApply(HWND hwnd)
 		regCloseKey(hk);
 	}
 
-	if( ghMutex )
-		ReleaseMutex(ghMutex);
-
+	//dbg("%s, openwide.exe: Releasing shared mem...", __func__);
+	unlockSharedMem();
 	setStartupApp(hwnd, bWinStart);
 	return 1;
 }
@@ -505,74 +612,6 @@ void	selectCBView(HWND hwnd, UINT uID, int iView)
 			break;
 		}
 	}
-}
-
-// CreateLink - uses the Shell's IShellLink and IPersistFile interfaces
-//              to create and store a shortcut to the specified object.
-//
-// Returns the result of calling the member functions of the interfaces.
-//
-// Parameters:
-// lpszPathObj  - address of a buffer containing the path of the object.
-// lpszPathLink - address of a buffer containing the path where the
-//                Shell link is to be stored.
-// lpszDesc     - address of a buffer containing the description of the
-//                Shell link.
-
-HRESULT CreateLink(LPCSTR lpszPathObj, LPCSTR lpszPathLink, LPCSTR lpszDesc)
-{
-    HRESULT hres;
-    IShellLink* psl;
-
-    // Get a pointer to the IShellLink interface.
-    hres = CoCreateInstance(&CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER,
-                            &IID_IShellLink, (LPVOID*)&psl);
-    if (SUCCEEDED(hres))
-    {
-        IPersistFile* ppf;
-
-        // Set the path to the shortcut target and add the description.
-        psl->SetPath(lpszPathObj);
-        psl->SetDescription(lpszDesc);
-
-        // Query IShellLink for the IPersistFile interface for saving the
-        // shortcut in persistent storage.
-        hres = psl->QueryInterface(&IID_IPersistFile, (LPVOID*)&ppf);
-
-        if (SUCCEEDED(hres))
-        {
-            WCHAR wsz[MAX_PATH];
-
-            // Ensure that the string is Unicode.
-            MultiByteToWideChar(CP_ACP, 0, lpszPathLink, -1, wsz, MAX_PATH);
-
-            // TODO: Check return value from MultiByteWideChar to ensure success.
-            // Save the link by calling IPersistFile::Save.
-            hres = ppf->Save(wsz, TRUE);
-            ppf->Release();
-        }
-        psl->Release();
-    }
-    return hres;
-}
-
-
-
-/* Copied by pro2 : (c)2004 Luke Hudson */
-/** Function source : C:\Data\Code\C\Proto\util.c */
-BOOL fileExists (const char *path)
-{
-	int errCode;
-
-	if (GetFileAttributes (path) == 0xFFFFFFFF)
-	{
-		errCode = GetLastError ();
-		if (errCode == ERROR_FILE_NOT_FOUND
-				|| errCode == ERROR_PATH_NOT_FOUND)
-			return FALSE;
-		dbg ("fileExists? getLastError gives %d", errCode);
-	}
-	return TRUE;
 }
 
 
@@ -738,31 +777,6 @@ BOOL WINAPI CALLBACK wpPlacement(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 	return 1;
 }
 
-int	getDlgItemRect(HWND hwnd, UINT uID, LPRECT pr)
-{
-	if(!IsWindow(hwnd) || !pr)
-		return 0;
-	HWND hwCtl = GetDlgItem(hwnd, uID);
-	if(!hwCtl)
-		return 0;
-	if(!GetWindowRect(hwCtl, pr))
-		return 0;
-	MapWindowPoints(NULL, hwnd, (LPPOINT)&pr->left, 2);
-	return 1;
-}
-
-void	setChanged(HWND hwnd, BOOL bChanged)
-{
-	gbChanged = bChanged;
-	EnableWindow( GetDlgItem(hwnd, IDOK), bChanged);
-	if( !bChanged )
-		SetFocus( GetDlgItem(hwnd, IDB_TEST) );
-}
-
-BOOL	isChanged(void)
-{
-	return gbChanged;
-}
 
 static void onCommand(HWND hwnd, WPARAM wp, LPARAM lp)
 {
@@ -791,7 +805,7 @@ static void onCommand(HWND hwnd, WPARAM wp, LPARAM lp)
 				r.right = max( GetDlgItemInt(hwnd, IDE_WIDTH, NULL, FALSE), 100 );
 				r.bottom = max( GetDlgItemInt(hwnd, IDE_HEIGHT, NULL, FALSE), 100 );
 
-				if( DialogBoxParam(hInst, MAKEINTRESOURCE(IDD_PLACEMENT), hwnd, wpPlacement, (LPARAM)&r) )
+				if( DialogBoxParam(ghInstance, MAKEINTRESOURCE(IDD_PLACEMENT), hwnd, wpPlacement, (LPARAM)&r) )
 				{
 					SetDlgItemInt(hwnd, IDE_LEFT, r.left, TRUE);
 					SetDlgItemInt(hwnd, IDE_TOP, r.top, TRUE);
@@ -833,6 +847,7 @@ static void onCommand(HWND hwnd, WPARAM wp, LPARAM lp)
 //			rmvHook();
 			Prompt_File_Name(0, hwnd, NULL, NULL);
 //			setHook(hwnd);
+//			propSheet(hwnd, "Testing", NULL, 3, IDD_WINSETTINGS, wpPageWinSettings, IDD_FOLDERS, wpPageFolders, IDD_PREFS, wpPagePrefs);
 			break;
 	}
 }
@@ -840,7 +855,7 @@ static void onCommand(HWND hwnd, WPARAM wp, LPARAM lp)
 
 int		addTrayIcon(HWND hwnd)
 {
-	HICON hIcon = (HICON)LoadImage(hInst, MAKEINTRESOURCE(IDI_TRAY), IMAGE_ICON, 16,16, LR_SHARED | LR_VGACOLOR);
+	HICON hIcon = (HICON)LoadImage(ghInstance, MAKEINTRESOURCE(IDI_TRAY), IMAGE_ICON, 16,16, LR_SHARED | LR_VGACOLOR);
 	return Add_TrayIcon( hIcon, "OpenWide\r\nLeft-Click to show...", hwnd, WM_TRAYICON, 0);
 }
 
@@ -848,6 +863,26 @@ void	remTrayIcon(HWND hwnd)
 {
 	Rem_TrayIcon( hwnd, WM_TRAYICON, 0 );
 }
+
+
+void doTrayMenu(HWND hwnd)
+{
+	HMENU hm = CreatePopupMenu();
+	AppendMenu(hm, MF_STRING, 0, "Show options");
+	SetMenuDefaultItem(hm, 0, TRUE);
+	AppendMenu(hm, MF_GRAYED | MF_SEPARATOR, 0, NULL);
+	AppendMenu(hm, MF_STRING, 0, "About OpenWide...");
+	AppendMenu(hm, MF_STRING, 0, "Help...");
+	AppendMenu(hm, MF_GRAYED | MF_SEPARATOR, 0, NULL);
+	AppendMenu(hm, MF_STRING, 0, "Quit");
+
+	POINT pt;
+	GetCursorPos(&pt);
+	TrackPopupMenu(hm, TPM_LEFTALIGN | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
+
+	DestroyMenu(hm);
+}
+
 
 BOOL WINAPI CALLBACK wpMain(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
@@ -863,10 +898,13 @@ BOOL WINAPI CALLBACK wpMain(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			switch(lp)
 			{
 				case WM_LBUTTONUP:
+					remTrayIcon(hwnd);
 					ShowWindow(hwnd, SW_SHOWNORMAL);
 					EnableWindow(hwnd, TRUE);
-					remTrayIcon(hwnd);
-					SetFocus(hwnd);
+					SetFocus(GetDlgItem(hwnd, IDB_TEST));
+					break;
+				case WM_RBUTTONUP:
+					doTrayMenu(hwnd);
 					break;
 			}
 			break;
@@ -908,17 +946,18 @@ int createWin(void)
 
 	if(!GetClassInfoEx(NULL, WC_DIALOG, &wc))
 		return 0;
-	wc.hIconSm = (HICON)LoadImage(hInst, MAKEINTRESOURCE(IDI_TRAY), IMAGE_ICON, 16,16, LR_SHARED | LR_VGACOLOR);
-	if( !RegisterClassEx(&wc) )
-		return 0;
+	wc.hIconSm = (HICON)LoadImage(ghInstance, MAKEINTRESOURCE(IDI_APP), IMAGE_ICON, 16,16, LR_SHARED | LR_VGACOLOR);
+	wc.hIcon = (HICON)LoadImage(ghInstance, MAKEINTRESOURCE(IDI_APP), IMAGE_ICON, 32,32, LR_SHARED | LR_VGACOLOR);
+	RegisterClassEx(&wc);
+		//return 0;
 
-	ghwMain = CreateDialog(hInst, MAKEINTRESOURCE(IDD_MAIN), NULL, wpMain);
+	ghwMain = CreateDialog(ghInstance, MAKEINTRESOURCE(IDD_MAIN), NULL, wpMain);
 	if( !ghwMain )
 		Warn("Unable to create main dialog: %s", geterrmsg());
 	return (ghwMain!=NULL);
 }
 
-int init(void)
+int initApp(void)
 {
 	HRESULT hRes = CoInitialize(NULL);
 	if( hRes != S_OK && hRes != S_FALSE )
@@ -929,7 +968,7 @@ int init(void)
 }
 
 
-void shutdown(void)
+void shutdownApp(void)
 {
 	if(ghwMain)
 	{
@@ -956,10 +995,10 @@ int WINAPI WinMain(HINSTANCE hi, HINSTANCE hiPrv, LPSTR fakeCmdLine, int iShow)
 		}
 		return 0;
 	}
-	hInst = hi;
-	if( !init() )
+	ghInstance = hi;
+	if( !initApp() )
 	{
-		shutdown();
+		shutdownApp();
 		return 0;
 	}
 
@@ -975,7 +1014,7 @@ int WINAPI WinMain(HINSTANCE hi, HINSTANCE hiPrv, LPSTR fakeCmdLine, int iShow)
 		}
 	}
 
-	shutdown();
+	shutdownApp();
 	return 0;
 }
 

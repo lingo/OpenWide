@@ -1,0 +1,18 @@
+[OPTIONS]
+Compatibility=1.1 or later
+Compiled file=openwide.chm
+Default Window=Main
+Default topic=openwide.htm
+Display compile progress=No
+Language=0x1409 English (New Zealand)
+
+[WINDOWS]
+Main="OpenWide Help",,,"openwide.htm","openwide.htm",,,,,0x2020,,0x4c,[0,0,600,600],0x100f0000,,,1,,,0
+
+
+[FILES]
+openwide.htm
+license.htm
+
+[INFOTYPES]
+

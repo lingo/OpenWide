@@ -1,0 +1,8 @@
+License:
+Unless otherwise indicated, all Lingo software can be freely used in all non-commercial ventures. The software may be redistributed freely, so long as the license information accompanies distributions. 
+
+The software is copyrighted by Luke Hudson. No other person or company may claim authorship of this software. 
+
+Warranty:
+Absolutely no warranty or guarantee is offered, and no responsibility is taken for damage or disturbance caused either directly or indirectly due to use or possession of this software. 
+ 

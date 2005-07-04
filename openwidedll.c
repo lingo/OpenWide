@@ -1,126 +1,96 @@
 /* --- The following code comes from c:\lcc\lib\wizard\dll.tpl. */
+//#include  <stdarg.h>
+//#include  <stdio.h>
 #include <windows.h>
+#include <commctrl.h>
 #include	<shlwapi.h>
+#include <stdlib.h>
 #include	<shellapi.h>
-#include	<stdarg.h>
-#include	<stdio.h>
 #include	<dlgs.h>
+#include	<excpt.h>
 #include	"openwidedll.h"
 #include	"openwide.h"
-//#include	"dbgwm.h"
+#include	"owdll.h"
+#include	"winutil.h"
+//#include  "link.h"
+//#include  "dbgwm.h"
 
-static HINSTANCE ghInst = NULL;
-
-static HHOOK ghMsgHook = NULL, ghSysMsgHook = NULL;
-static BOOL gbHooked = FALSE;
-
-static HANDLE	ghMutex = NULL;
-static OWSharedData	gOwShared;
-
-#define	OW_ABOUT_CMDID		0x1010
-#define	OW_EXPLORE_CMDID	0x1020
+////////////////////////////////////////////////////////////////////////////////
+//  Defines
 
 #define	OW_LISTVIEW_STYLE	(LVS_EX_FULLROWSELECT)
 
-typedef struct OWSubClassData
-{
-	WNDPROC		wpOrig;
-	LPARAM		lpData;
-	BOOL		bSet;
+
+////////////////////////////////////////////////////////////////////////////////
+//  Types
+
+typedef struct OWSubClassData {
+	WNDPROC wpOrig;
+	LPARAM lpData;
+	BOOL bSet;
 } OWSubClassData, *POWSubClassData;
 
-//static BOOL gbDbg = FALSE;
+
+typedef struct FindChildData {
+	const char *szClass;
+	UINT uID;
+	HWND hwFound;
+} FindChildData, *PFindChildData;
+
+////////////////////////////////////////////////////////////////////////////////
+//  Globals
+
+//static BOOL   gbDbg = FALSE;
+
+HINSTANCE ghInstance = NULL;
+static HHOOK ghMsgHook = NULL, ghSysMsgHook = NULL;
+static BOOL gbHooked = FALSE;
+static HANDLE ghMutex = NULL;
+static HANDLE ghMap = NULL;
+static OWSharedData gOwShared;
+
 
 ////////////////////////////////////////////////////////////////////////////////
 //  Prototypes
-/* Copied by pro2 : (c)2004 Luke Hudson */
+/* Copied on : Tue May 10 23:20:15 2005 */
+
+static int addTBButton(HWND hwnd);
 static LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam);
-void dbg(char *szError, ...);
-WORD focusToCtlID(int iFocus);
-DWORD DLLEXPORT GetDllVersion(LPCTSTR lpszDllName);
-int getSharedData(void);
-int initSharedMem(void);
-BOOL DLLEXPORT isWinXP(void);
-BOOL WINAPI DLLEXPORT LibMain(HINSTANCE hDLLInst, DWORD fdwReason, LPVOID lpvReserved);
-void releaseSharedMem(void);
-int DLLEXPORT rmvHook(void);
-int DLLEXPORT setHook(HWND hwLB);
-int subclass(HWND hwnd, WNDPROC wpNew, LPARAM lpData);
+static int doAddFave(HWND hwnd);
+static void dropMenu(HWND hwnd, HWND hwTB, UINT uiItem);
+static int CALLBACK WINAPI enumFindChildWindow(HWND hwnd, PFindChildData pData);
+static HWND findChildWindow(HWND hwParent, UINT uID, const char *szClass);
+static int focusDlgItem(HWND hwnd, int iFocus);
+static WORD focusToCtlID(int iFocus);
+static void getFavourite(HWND hwnd, int idx);
+static int getSharedData(void);
+static int initSharedMem(void);
+static BOOL isOpenSaveDlg(HWND hwNew, LPCREATESTRUCT pcs);
+static int openWide(HWND hwnd);
+static void releaseSharedMem(void);
+static void setCDMPath(HWND hwnd, const char *szPath);
+static int subclass(HWND hwnd, WNDPROC wpNew, LPARAM lpData);
 static LRESULT CALLBACK SysMsgProc(int nCode, WPARAM wParam, LPARAM lParam);
-void CALLBACK timerProc(HWND hwnd, UINT uMsg, UINT uID, DWORD dwTime);
-int unsubclass(HWND hwnd);
-WORD viewToCmdID(int iView);
-LRESULT CALLBACK WINAPI wpSubMain(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
-LRESULT CALLBACK WINAPI wpSubShellCtl(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
-int focusDlgItem(HWND hwnd, int iFocus);
-LRESULT CALLBACK WINAPI wpOverlay(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
-/*------------------------------------------------------------------------
- Procedure:     LibMain ID:1
- Purpose:       Dll entry point.Called when a dll is loaded or
-                unloaded by a process, and when new threads are
-                created or destroyed.
- Input:         hDllInst: Instance handle of the dll
-                fdwReason: event: attach/detach
-                lpvReserved: not used
- Output:        The return value is used only when the fdwReason is
-                DLL_PROCESS_ATTACH. True means that the dll has
-                sucesfully loaded, False means that the dll is unable
-                to initialize and should be unloaded immediately.
- Errors:
-------------------------------------------------------------------------*/
-BOOL WINAPI DLLEXPORT LibMain(HINSTANCE hDLLInst, DWORD fdwReason, LPVOID lpvReserved)
+static int unsubclass(HWND hwnd);
+static WORD viewToCmdID(int iView);
+static LRESULT CALLBACK WINAPI wpSubMain(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
+
+////////////////////////////////////////////////////////////////////////////////
+//  Functions
+
+
+static int subclass(HWND hwnd, WNDPROC wpNew, LPARAM lpData)
 {
-    switch (fdwReason)
-    {
-        case DLL_PROCESS_ATTACH:
-            // The DLL is being loaded for the first time by a given process.
-            // Perform per-process initialization here.  If the initialization
-            // is successful, return TRUE; if unsuccessful, return FALSE.
-			ghInst = hDLLInst;
-            break;
-        case DLL_PROCESS_DETACH:
-            // The DLL is being unloaded by a given process.  Do any
-            // per-process clean up here, such as undoing what was done in
-            // DLL_PROCESS_ATTACH.  The return value is ignored.
-			ghInst = NULL;
-	        break;
-        case DLL_THREAD_ATTACH:
-            // A thread is being created in a process that has already loaded
-            // this DLL.  Perform any per-thread initialization here.  The
-            // return value is ignored.
-
-            break;
-        case DLL_THREAD_DETACH:
-            // A thread is exiting cleanly in a process that has already
-            // loaded this DLL.  Perform any per-thread clean up here.  The
-            // return value is ignored.
-
-            break;
-    }
-    return TRUE;
-}
-
-void dbg(char *szError, ...)
-{
-	char		szBuff[256];
-	va_list		vl;
-	va_start(vl, szError);
-    vsnprintf(szBuff, 256, szError, vl);	// print error message to string
-	OutputDebugString(szBuff);
-	va_end(vl);
-}
-
-int	subclass(HWND hwnd, WNDPROC wpNew, LPARAM lpData)
-{
-	if( GetProp(hwnd, OW_PROP_NAME) != NULL )
+	if (GetProp(hwnd, OW_PROP_NAME) != NULL)
 		return 0;
-	POWSubClassData pow = (POWSubClassData)malloc(sizeof(OWSubClassData));
-	if(!pow)
+	POWSubClassData pow = (POWSubClassData)GlobalAlloc(GPTR, sizeof(OWSubClassData));	// was malloc
+	if (!pow)
 		return 0;
 	ZeroMemory(pow, sizeof(OWSubClassData));
-	if( !SetProp(hwnd, OW_PROP_NAME, pow) )
+	if (!SetProp(hwnd, OW_PROP_NAME, pow))
 	{
-		free(pow);
+		GlobalFree(pow);
+		//free(pow);
 		return 0;
 	}
 	pow->lpData = lpData;
@@ -128,119 +98,170 @@ int	subclass(HWND hwnd, WNDPROC wpNew, LPARAM lpData)
 	return 1;
 }
 
-int	unsubclass(HWND hwnd)
+static int unsubclass(HWND hwnd)
 {
 	POWSubClassData pow = (POWSubClassData)GetProp(hwnd, OW_PROP_NAME);
-	if(pow)
+	if (pow)
 	{
 		SetWindowLong(hwnd, GWL_WNDPROC, (LONG)pow->wpOrig);
 		RemoveProp(hwnd, OW_PROP_NAME);
-		free(pow);
+		GlobalFree(pow);
+		//free(pow);
 		return 1;
 	}
 	return 0;
 }
 
-HWND	createOverlayWindow(HWND hwParent)
+
+static int CALLBACK WINAPI enumFindChildWindow(HWND hwnd, PFindChildData pData)
 {
-	RECT rc;
-	GetClientRect(hwParent, &rc);
-
-	WNDCLASSEX wc = {0};
-	wc.cbSize = sizeof(wc);
-	wc.hbrBackground = NULL;
-	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-	wc.hInstance = ghInst;
-	wc.lpfnWndProc = wpOverlay;
-	wc.lpszClassName = OW_OVERLAY_CLASS;
-	wc.style = CS_DBLCLKS;
-	RegisterClassEx(&wc);
-
-	return CreateWindowEx(WS_EX_TRANSPARENT | WS_EX_NOACTIVATE, OW_OVERLAY_CLASS, NULL,
-		WS_VISIBLE | WS_CHILD,
-		0,0, rc.right, rc.bottom,
-		hwParent, (HMENU)CID_OVERLAY, ghInst, NULL);
-}
-
-HWND 	getChildWinFromPt(HWND hwnd)
-{
-	POINT pt;
-	GetCursorPos(&pt);
-	ScreenToClient(GetParent(hwnd), &pt);
-
-	EnableWindow(hwnd, FALSE);
-	HWND hw = ChildWindowFromPointEx(GetParent(hwnd), pt, CWP_SKIPDISABLED | CWP_SKIPINVISIBLE);
-	EnableWindow(hwnd, TRUE);
-	HWND hwSV = GetDlgItem(GetParent(hwnd), CID_DIRLISTPARENT);
-	if( hw == hwSV )
+	UINT uID = GetDlgCtrlID(hwnd);
+	static char buf[256];
+	if (uID == pData->uID)
 	{
-		ClientToScreen(GetParent(hwnd), &pt);
-		ScreenToClient(hw, &pt);
-		hw = ChildWindowFromPointEx(hw, pt, CWP_SKIPDISABLED | CWP_SKIPINVISIBLE);
-	}
-	HWND hwEd = GetDlgItem(GetParent(hwnd), CID_FNAME);
-	if( hw == hwEd )
-	{
-		ClientToScreen(GetParent(hwnd), &pt);
-		ScreenToClient(hw, &pt);
-		hw = ChildWindowFromPointEx(hw, pt, CWP_SKIPDISABLED | CWP_SKIPINVISIBLE);
-	}
-	return hw;
-}
-
-LRESULT CALLBACK WINAPI wpOverlay(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
-{
-//	POWSubClassData pow = (POWSubClassData)GetProp(hwnd, OW_PROP_NAME);
-///	if( !pow )
-//		return DefWindowProc(hwnd, msg, wp, lp);
-
-	switch(msg)
-	{
-		case WM_CREATE:
+		//dbg("Found window %p with id %d", hwnd, uID);
+		if (GetClassName(hwnd, buf, 256) && strcmp(buf, pData->szClass) == 0)
+		{
+			pData->hwFound = hwnd;
 			return 0;
-		case WM_NCCREATE:
-			return TRUE;
-		case WM_MOUSEACTIVATE:
-			return MA_NOACTIVATE;
-		case WM_DROPFILES:
+		}
+		//else
+		//dbg("Window's class is %s - not what's wanted", buf);
+	}
+	return 1;
+}
+
+static HWND findChildWindow(HWND hwParent, UINT uID, const char *szClass)
+{
+	FindChildData fData;
+
+	fData.szClass = szClass;
+	fData.uID = uID;
+	fData.hwFound = NULL;
+
+	//dbg("findChildWindow: seeking \"%s\", %d", szClass, uID);
+
+	EnumChildWindows(hwParent, (WNDENUMPROC)enumFindChildWindow, (LPARAM) & fData);
+
+	return fData.hwFound;
+}
+
+static void dropMenu(HWND hwnd, HWND hwTB, UINT uiItem)
+{
+	RECT r;
+	SendMessage(hwTB, TB_GETRECT, uiItem, (LPARAM) & r);
+	MapWindowPoints(hwTB, NULL, (LPPOINT) & r, 2);
+
+	TPMPARAMS tpm = { 0 };
+	tpm.cbSize = sizeof(tpm);
+	tpm.rcExclude = r;
+
+	HMENU hm = CreatePopupMenu();
+	AppendMenu(hm, MF_STRING, OW_EXPLORE_CMDID, "&Locate current folder with Explorer...");
+	AppendMenu(hm, MF_STRING, OW_ADDFAV_CMDID, "Add &Favourite");
+	SetMenuDefaultItem(hm, OW_ADDFAV_CMDID, FALSE);
+
+	POWSharedData pow = lockSharedData();
+	if (pow)
+	{
+		dbg("%s, Locked shared data ok", __func__);
+		PFavLink pFav = pow->pFaves;
+		if (pFav)
+		{
+			MENUITEMINFO mii = { 0 };
+			mii.cbSize = sizeof(mii);
+			AppendMenu(hm, MF_SEPARATOR | MF_DISABLED, 0, NULL);
+			for (int i = 0; i < pow->nFaves; i++)
 			{
-				HANDLE hDrop = (HANDLE)wp;
-				int nFiles = DragQueryFile(hDrop, (UINT)-1, NULL, 0);
-				if( nFiles == 1 )
-				{
-					static char buf[MAX_PATH+1];
-					if( DragQueryFile(hDrop, 0, buf, MAX_PATH) )
-					{
-						if( PathIsDirectory(buf) )
-						{
-							HWND hw = GetParent(hwnd);
-							SetDlgItemText(hw, CID_FNAME, buf);
-							SendDlgItemMessage(hw, CID_FNAME, EM_SETSEL, -1, -1);
-							SendDlgItemMessage(hw, CID_FNAME, EM_REPLACESEL, FALSE, (LPARAM)"\\");
-							SendMessage(hw, WM_COMMAND, MAKEWPARAM(IDOK, BN_CLICKED), (LPARAM)GetDlgItem(hwnd, IDOK));
-							SetDlgItemText(hw, CID_FNAME, "");
-							if( getSharedData() )
-							{
-								focusDlgItem(hw, gOwShared.iFocus);
-							}
-						}
-					}
-				}
+				pFav = getNthFave(pow, i);
+				if (!pFav)
+					break;
+				static char szBuf[MAX_PATH + 8];
+
+				dbgLink("inserting...", pFav);
+				mii.fMask = MIIM_STRING | MIIM_DATA | MIIM_ID;
+				mii.fType = MFT_STRING;
+				wsprintf(szBuf, "%s\tCtrl+%d", pFav->szFav, (pFav->idCmd - OW_FAVOURITE_CMDID) + 1);
+				mii.dwTypeData = szBuf;
+				mii.dwItemData = pFav->idCmd;
+				mii.wID = pFav->idCmd;
+
+				int iRes = InsertMenuItem(hm, -1, TRUE, &mii);
+				if (iRes == 0)
+					dbg("%s, Failed inserting item: %s", __func__, geterrmsg());
+				//idx = AppendMenu(hm, MF_STRING, iCmd++, pFav->szFav);
 			}
-			return 0;
-		case WM_ERASEBKGND:
-			return 1;
-		case WM_PAINT:
-			ValidateRect(hwnd, NULL);
-			return 0;
-		default:
-			return DefWindowProc(hwnd, msg, wp, lp);
+		}
+		unlockSharedData(pow);
 	}
-	return 0;
+
+	AppendMenu(hm, MF_SEPARATOR | MF_DISABLED, 0, NULL);
+	AppendMenu(hm, MF_STRING, OW_ABOUT_CMDID, "&About OpenWide...");
+	TrackPopupMenuEx(hm, TPM_LEFTALIGN | TPM_LEFTBUTTON | TPM_VERTICAL, r.left, r.bottom, hwnd, &tpm);
+	DestroyMenu(hm);
+}
+
+int addIcon2TB(HWND hwTB, HICON hIcn)
+{
+	HIMAGELIST hImgList = NULL;
+	hImgList = (HIMAGELIST)SendMessage(hwTB, TB_GETIMAGELIST, 0, 0);
+	if (hImgList)
+	{
+		int nImgs = ImageList_GetImageCount(hImgList);
+
+		int idxNew = ImageList_AddIcon(hImgList, hIcn);
+		if (idxNew == -1)
+		{
+			dbg("%s, Error adding to imglist: %s", __func__, geterrmsg());
+			return -1;
+		}
+		else
+		{
+			//dbg("%s, Image added at index %d", __func__, idxNew);
+			SendMessage(hwTB, TB_SETIMAGELIST, 0, (LPARAM)hImgList);
+			return idxNew;
+		}
+	}
+	else
+		return -1;
+}
+
+static int addTBButton(HWND hwnd)
+{
+	HWND hwTB = findChildWindow(hwnd, CID_TOOLBAR, TOOLBARCLASSNAME);
+
+	TBBUTTON tb = { 0 };
+	tb.iBitmap = VIEW_NETCONNECT;
+
+	int idxNew = -1;
+	HICON hIcn = (HICON)LoadImage(ghInstance, MAKEINTRESOURCE(IDI_TBICON), IMAGE_ICON, 16, 16, 0);
+	if (hIcn)
+	{
+		idxNew = addIcon2TB(hwTB, hIcn);
+		DestroyIcon(hIcn);
+	}
+	if (idxNew >= 0)
+		tb.iBitmap = idxNew;
+	tb.idCommand = OW_TBUTTON_CMDID;
+	tb.fsStyle = BTNS_AUTOSIZE | BTNS_BUTTON | BTNS_SHOWTEXT | BTNS_DROPDOWN;	// BTNS_WHOLEDROPDOWN;
+	tb.fsState = TBSTATE_ENABLED;
+	tb.iString = (INT_PTR)"OpenWide: Click to add a favourite!";
+	SendMessage(hwTB, TB_ADDBUTTONS, 1, (LPARAM) & tb);
+
+	RECT r;
+	int idxLast = SendMessage(hwTB, TB_BUTTONCOUNT, 0, 0) - 1;
+	if (SendMessage(hwTB, TB_GETITEMRECT, idxLast, (LPARAM) & r))
+	{
+		RECT rw;
+		GetWindowRect(hwTB, &rw);
+		MapWindowPoints(hwTB, NULL, (LPPOINT) & r, 2);
+		SetWindowPos(hwTB, NULL, 0, 0, (r.right + 8) - rw.left, rw.bottom - rw.top + 1, SWP_NOMOVE | SWP_NOZORDER);
+	}
+	return 1;
 }
 
 
-int		openWide(HWND hwnd)
+static int openWide(HWND hwnd)
 {
 	// set placement
 	int w = gOwShared.szDim.cx;
@@ -251,30 +272,29 @@ int		openWide(HWND hwnd)
 
 	// set view mode
 	HWND hwDirCtl = GetDlgItem(hwnd, CID_DIRLISTPARENT);
-	WORD	vCmdID = viewToCmdID(gOwShared.iView);
-//	dbg("Sending message to set view, cmd id %d", vCmdID);
+	WORD vCmdID = viewToCmdID(gOwShared.iView);
+	//dbg("Sending message to set view (%d), cmd id %d", gOwShared.iView, vCmdID);
 	SendMessage(hwDirCtl, WM_COMMAND, MAKEWPARAM(vCmdID, 0), 0);
 
 	focusDlgItem(hwnd, gOwShared.iFocus);
 
 	// debug hook, to find menu cmd IDs
-#ifdef	DEBUG
+#ifdef	DEBUG_SYSMSG
 	dbg("Hooking SYSMSG...");
-	ghSysMsgHook = SetWindowsHookEx(
-						WH_SYSMSGFILTER,
-				        SysMsgProc,
-				        ghInst,
-				        0 //GetCurrentThreadId()            // Only install for THIS thread!!!
-				);
+	ghSysMsgHook = SetWindowsHookEx(WH_SYSMSGFILTER, SysMsgProc, ghInstance, 0	//GetCurrentThreadId()            // Only install for THIS thread!!!
+		);
 	dbg("Hooking returned %p", ghSysMsgHook);
 #endif
+
 	DragAcceptFiles(hwnd, TRUE);
 	//SetWindowLong(hwnd, GWL_STYLE, GetWindowLong(hwnd, GWL_STYLE) | WS_CAPTION | WS_SYSMENU);
 
+/*
 	HMENU hm = GetSystemMenu(hwnd, FALSE);
 	AppendMenu(hm, MF_SEPARATOR | MF_DISABLED, 0, NULL);
 	AppendMenu(hm, MF_STRING, OW_EXPLORE_CMDID, "&Locate current folder with Explorer...");
 	AppendMenu(hm, MF_STRING, OW_ABOUT_CMDID, "&About OpenWide...");
+*/
 
 /*
 	HWND hwShellCtl = GetDlgItem(hwnd, CID_DIRLISTPARENT);
@@ -286,90 +306,174 @@ int		openWide(HWND hwnd)
 	SetWindowPos(hwOv, HWND_TOP, 0,0,0,0, SWP_NOMOVE | SWP_NOSIZE);
 	SetActiveWindow(hwnd);
 	DragAcceptFiles(hwOv, TRUE);*/
+
 	return 1;
 }
 
-LRESULT CALLBACK WINAPI wpSubMain(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
+static int doAddFave(HWND hwnd)
+{
+	int rv;
+	POWSharedData pow = lockSharedData();
+	if (pow)
+	{
+		//printLinks(pow->pFaves);
+		dbg("%s: Locked shared data ok", __func__);
+		rv = addFavourite(hwnd, pow);
+		unlockSharedData(pow);
+	}
+	return rv;
+}
+
+/*
+static void	setCDMPath(HWND hwnd, const char *szPath)
+{
+	SetDlgItemText(hwnd, CID_FNAME, szPath);
+	SendDlgItemMessage(hwnd, CID_FNAME, EM_SETSEL, -1, -1);
+	SendDlgItemMessage(hwnd, CID_FNAME, EM_REPLACESEL, FALSE, (LPARAM)"\\");
+	SendMessage(hwnd, WM_COMMAND, MAKEWPARAM(IDOK, BN_CLICKED), (LPARAM)GetDlgItem(hwnd, IDOK));
+	SetDlgItemText(hwnd, CID_FNAME, "");
+}
+*/
+
+static void getFavourite(HWND hwnd, int idx)
+{
+	POWSharedData pow = lockSharedData();
+	if (pow)
+	{
+		PFavLink plk = findFaveByCmdID(pow, idx);
+		dbg("%s:	findFaveByCmdID(%d) returned %p", __func__, idx, plk);
+		if (plk && plk->szFav)
+		{
+			SetDlgItemText(hwnd, CID_FNAME, plk->szFav);
+			SendDlgItemMessage(hwnd, CID_FNAME, EM_SETSEL, -1, -1);
+			SendDlgItemMessage(hwnd, CID_FNAME, EM_REPLACESEL, FALSE, (LPARAM)"\\");
+		}
+		unlockSharedData(pow);
+		SendMessage(hwnd, WM_COMMAND, MAKEWPARAM(IDOK, BN_CLICKED), (LPARAM)GetDlgItem(hwnd, IDOK));
+		SetDlgItemText(hwnd, CID_FNAME, "");
+	}
+}
+
+static LRESULT CALLBACK WINAPI wpSubMain(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
 /*	if( gbDbg )
 	{
 		dbgWM(hwnd, msg, wp, lp);
 	}*/
 	POWSubClassData pow = (POWSubClassData)GetProp(hwnd, OW_PROP_NAME);
-	if( !pow )
+	if (!pow)
 		return DefWindowProc(hwnd, msg, wp, lp);
 
-	static char buffer[MAX_PATH+1];
+	static char buffer[MAX_PATH + 1];
 
-	switch(msg)
+	switch (msg)
 	{
 		case WM_INITDIALOG:
+		{
+			LRESULT lRes = CallWindowProc(pow->wpOrig, hwnd, msg, wp, lp);
+			if (!initSharedMem())
 			{
-				LRESULT lRes = CallWindowProc(pow->wpOrig, hwnd, msg, wp, lp);
-				ShowWindow(hwnd, SW_HIDE);
+				dbg("WM_INITDIALOG: initSharedMem failed");
+				unsubclass(hwnd);
 				return lRes;
 			}
+			//dbg("subclass wproc got WM_INITDIALOG, %p, %p", wp, lp);
+			addTBButton(hwnd);
+			initPlaces(hwnd);
+			ShowWindow(hwnd, SW_HIDE);
+			return lRes;
+		}
 			break;
 		case WM_SHOWWINDOW:
-			if( wp && !pow->bSet )
+			if (wp && !pow->bSet)
 			{
 				pow->bSet = TRUE;
+				//subclass(GetDlgItem(hwnd, CID_DIRLISTPARENT), wpSubShellCtl, (LPARAM)0);
+				dbg("%s : First wm_showwindow, now modifying dlg...", __func__);
 				openWide(hwnd);
 			}
 			break;
-		/*case WM_SIZE:
+		case WM_COMMAND:
+			switch (LOWORD(wp))
 			{
-				LRESULT lRes = CallWindowProc(pow->wpOrig, hwnd, msg, wp, lp);
-				int w = LOWORD(lp);
-				int h = HIWORD(lp);
-				MoveWindow( GetDlgItem(hwnd, CID_OVERLAY), 0,0, w,h, FALSE);
-				return lRes;
+				case OW_ABOUT_CMDID:
+					MessageBox(hwnd, "OpenWide is written by Luke Hudson. (c)2005", "About OpenWide", MB_OK);
+					return 0;
+				case OW_EXPLORE_CMDID:
+				{
+					char *szParm = "/select,";
+					wsprintf(buffer, szParm);
+					int len = strlen(szParm);
+					len = SendMessage(hwnd, CDM_GETFOLDERPATH, MAX_PATH - len, (LPARAM) (buffer + len));
+					if (len)
+					{
+						ShellExecute(hwnd, NULL, "explorer.exe", buffer, NULL, SW_SHOWNORMAL);
+					}
+				}
+					return 0;
+				case OW_TBUTTON_CMDID:
+				case OW_ADDFAV_CMDID:
+					doAddFave(hwnd);
+					return 0;
+				default:
+					if (LOWORD(wp) >= OW_FAVOURITE_CMDID)
+					{
+						getFavourite(hwnd, (int)LOWORD(wp));
+					}
+					break;
 			}
-			break;*/
-//		case WM_COMMAND:
-//			dbg("Got WM_COMMAND: id %d, code %d", LOWORD(wp), HIWORD(wp));
-//			break;
+			break;
 		case WM_PARENTNOTIFY:
-			if( LOWORD(wp) ==  WM_CREATE)
+			if (LOWORD(wp) == WM_CREATE)
 			{
 				static char buf[33];
 				GetClassName((HWND)lp, buf, 32);
 
-				if( strcmp(buf, "SHELLDLL_DefView") == 0 )
+				if (strcmp(buf, "SHELLDLL_DefView") == 0)
 				{
-//					dbg("Shell defview ctl created");
-//					subclass((HWND)lp, wpSubShellCtl, (LPARAM)hwnd);
+					//dbg("Shell defview ctl created");
+					//subclass((HWND)lp, wpSubShellCtl, (LPARAM)0);
 					HWND hwLV = GetDlgItem((HWND)lp, 1);
-					DragAcceptFiles(hwLV, TRUE);
-					if( hwLV )
+					//DragAcceptFiles(hwLV, TRUE);
+					if (hwLV)
 					{
-						if( GetWindowLong(hwLV, GWL_STYLE) & LVS_REPORT )
+						if (GetWindowLong(hwLV, GWL_STYLE) & LVS_REPORT)
 						{
 							//dbg("hwLV is in report mode -- setting extended style");
-							ListView_SetExtendedListViewStyleEx(hwLV, OW_LISTVIEW_STYLE, OW_LISTVIEW_STYLE );
+							ListView_SetExtendedListViewStyleEx(hwLV, OW_LISTVIEW_STYLE, OW_LISTVIEW_STYLE);
 						}
 					}
 					SetTimer(hwnd, 251177, 1, NULL);
 				}
 			}
 			break;
+		case WM_KEYUP:
+			if (wp >= VK_0 && wp <= VK_9)
+			{
+				if ((short)GetAsyncKeyState(VK_CONTROL) < 0)
+				{
+					int idx = wp - VK_0;
+					getFavourite(hwnd, idx);
+				}
+			}
+			break;
 		case WM_TIMER:
-			if( wp == 251177 )
+			if (wp == 251177)
 			{
 				KillTimer(hwnd, 251177);
 				HWND hwDirCtl = GetDlgItem(hwnd, CID_DIRLISTPARENT);
-				if( getSharedData() )
+				if (getSharedData())
 				{
-					if( gOwShared.iView == V_THUMBS || gOwShared.iView == V_TILES )
+					if (gOwShared.iView == V_THUMBS || gOwShared.iView == V_TILES)
 					{
-//						dbg("posting cmd message to reset view?");
-						WORD	vCmdID = viewToCmdID(gOwShared.iView);
+						dbg("openwide.dll : posting cmd message to reset view?");
+						WORD vCmdID = viewToCmdID(gOwShared.iView);
 						PostMessage(hwDirCtl, WM_COMMAND, MAKEWPARAM(vCmdID, 0), 0);
 					}
 				}
 			}
 			break;
-		case WM_SYSCOMMAND:
+/*-		case WM_SYSCOMMAND:
 			{
 				int cmdId = wp & 0xFFF0;
 				if( cmdId == OW_ABOUT_CMDID )
@@ -389,300 +493,194 @@ LRESULT CALLBACK WINAPI wpSubMain(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 					}
 				}
 			}
-			break;
-/*		case WM_NOTIFY:
+			break;*/
+		case WM_NOTIFY:
+		{
+			NMHDR *phdr = (NMHDR *)lp;
+			HWND hwTB = findChildWindow(hwnd, CID_TOOLBAR, TOOLBARCLASSNAME);
+			if (phdr->hwndFrom == hwTB)
 			{
-				NMHDR * phdr = (NMHDR *)lp;
-				HWND hwSV = GetDlgItem(hwnd, CID_DIRLISTPARENT);
+//                  dbg("Got notify %d from toolbar", phdr->code);
+				if (phdr->code == TBN_DROPDOWN)
+				{
+					NMTOOLBAR *ptb = (NMTOOLBAR *)lp;
+					if (ptb->iItem == OW_TBUTTON_CMDID)
+					{
+						dropMenu(hwnd, hwTB, ptb->iItem);
+						return TBDDRET_DEFAULT;
+					}
+				}
+			}
+/*				HWND hwSV = GetDlgItem(hwnd, CID_DIRLISTPARENT);
 				hwSV = GetDlgItem(hwSV, CID_DIRLIST);
 				if( phdr->hwndFrom == hwSV )
 				{
 					dbg("Got notify %d from listview", phdr->code);
-				}
-			}
-			break;*/
-/*		case WM_NCPAINT:
-			{
-				HDC hdc = GetWindowDC(hwnd);
-				HBRUSH hbrOld;
-				HPEN hpOld;
-				hbrOld = SelectObject(hdc, GetStockObject(BLACK_BRUSH));
-				hpOld = SelectObject(hdc, GetStockObject(NULL_PEN));
-				RECT r;
-				GetWindowRect(hwnd, &r);
-				r.right-=r.left;
-				r.left -= r.left;
-				r.bottom-=r.top;
-				r.top -= r.top;
-				RoundRect(hdc, r.left, r.top, r.right, r.bottom, 16,16);
-				SelectObject(hdc, hbrOld);
-				SelectObject(hdc, hpOld);
-				ReleaseDC(hwnd, hdc);
-			}
-			break;*/
+				}*/
+		}
+			break;
 		case WM_DROPFILES:
+		{
+			HANDLE hDrop = (HANDLE)wp;
+			int nFiles = DragQueryFile(hDrop, (UINT) - 1, NULL, 0);
+			//dbg("%d files dropped on main window %p", nFiles, hwnd);
+			if (nFiles == 1)
 			{
-				HANDLE hDrop = (HANDLE)wp;
-				int nFiles = DragQueryFile(hDrop, (UINT)-1, NULL, 0);
-				//dbg("%d files dropped on main window %p", nFiles, hwnd);
-				if( nFiles == 1 )
+				if (DragQueryFile(hDrop, 0, buffer, MAX_PATH))
 				{
-					if( DragQueryFile(hDrop, 0, buffer, MAX_PATH) )
+					if (PathIsDirectory(buffer))
 					{
-						if( PathIsDirectory(buffer) )
+						SetDlgItemText(hwnd, CID_FNAME, buffer);
+						SendDlgItemMessage(hwnd, CID_FNAME, EM_SETSEL, -1, -1);
+						SendDlgItemMessage(hwnd, CID_FNAME, EM_REPLACESEL, FALSE, (LPARAM)"\\");
+						SendMessage(hwnd, WM_COMMAND, MAKEWPARAM(IDOK, BN_CLICKED), (LPARAM)GetDlgItem(hwnd, IDOK));
+						SetDlgItemText(hwnd, CID_FNAME, "");
+						if (getSharedData())
 						{
-							SetDlgItemText(hwnd, CID_FNAME, buffer);
-							SendDlgItemMessage(hwnd, CID_FNAME, EM_SETSEL, -1, -1);
-							SendDlgItemMessage(hwnd, CID_FNAME, EM_REPLACESEL, FALSE, (LPARAM)"\\");
-							SendMessage(hwnd, WM_COMMAND, MAKEWPARAM(IDOK, BN_CLICKED), (LPARAM)GetDlgItem(hwnd, IDOK));
-							SetDlgItemText(hwnd, CID_FNAME, "");
-							if( getSharedData() )
-							{
-								focusDlgItem(hwnd, gOwShared.iFocus);
-							}
+							focusDlgItem(hwnd, gOwShared.iFocus);
 						}
 					}
 				}
 			}
+		}
 			return 0;
 		case WM_DESTROY:
-			{
-				WNDPROC wpOrig = pow->wpOrig;
-				unsubclass(hwnd);
-				return CallWindowProc(wpOrig, hwnd, msg, wp, lp);
-			}
+		{
+			WNDPROC wpOrig = pow->wpOrig;
+			unsubclass(hwnd);
+			return CallWindowProc(wpOrig, hwnd, msg, wp, lp);
+		}
 			break;
 	}
 	return CallWindowProc(pow->wpOrig, hwnd, msg, wp, lp);
 }
 
-LRESULT CALLBACK WINAPI wpSubShellCtl(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
-{
-	POWSubClassData pow = (POWSubClassData)GetProp(hwnd, OW_PROP_NAME);
-	if( !pow )
-		return DefWindowProc(hwnd, msg, wp, lp);
-
-	switch(msg)
-	{
-		case WM_DROPFILES:
-			{
-				HANDLE hDrop = (HANDLE)wp;
-				int nFiles = DragQueryFile(hDrop, (UINT)-1, NULL, 0);
-				dbg("%d files dropped, fwding mesg to %p", nFiles, pow->lpData);
-				return SendMessage((HWND)pow->lpData, msg, wp, lp);
-			}
-			break;
-		case WM_DESTROY:
-			{
-				WNDPROC wpOrig = pow->wpOrig;
-				unsubclass(hwnd);
-				dbg("SHell view being destroyed");
-				return CallWindowProc(wpOrig, hwnd, msg, wp, lp);
-			}
-			break;
-	}
-	return CallWindowProc(pow->wpOrig, hwnd, msg, wp, lp);
-}
-
-
-int initSharedMem(void)
+static int initSharedMem(void)
 {
 	ghMutex = OpenMutex(SYNCHRONIZE, FALSE, OW_MUTEX_NAME);
-	if( !ghMutex )
+	if (!ghMutex)
 		return 0;
 	return 1;
 }
 
 
-int getSharedData(void)
+POWSharedData lockSharedData(void)
 {
-	int		rv = 0;
-	if(ghMutex)
+	int rv = 0;
+	dbg("%s:  waiting for mutex", __func__);
+	if (ghMutex)
 	{
+		DWORD dwRes = WaitForSingleObject(ghMutex, 200);
+		if (dwRes != WAIT_OBJECT_0)
+		{
+			dbg("%s:	error, waitmutex returned %u", __func__, dwRes);
+			return NULL;
+		}
+	}
+	dbg("%s:  got mutex", __func__);
+	if (ghMap == NULL)
+	{
+		ghMap = OpenFileMapping(FILE_MAP_WRITE, FALSE, OW_SHARED_FILE_MAPPING);
+		dbg("%s:  openFileMapping returned %p", __func__, ghMap);
+	}
+	if (ghMap)
+	{
+		dbg("%s:  opened file mapping", __func__);
+		POWSharedData pow = (POWSharedData)MapViewOfFile(ghMap, FILE_MAP_WRITE, 0, 0, 0);
+		if (pow)
+		{
+			dbg("%s:  mapped view of file (%p)", __func__, pow);
+			if (lockFaves(pow))
+				return pow;
+		}
+		dbg("%s:	failed to map view of file, closing handle", __func__);
+		CloseHandle(ghMap);
+		ghMap = NULL;
+	}
+	else
+		dbg("%s, failed to open filemapping : %s", __func__, geterrmsg());
+	return NULL;
+}
+
+int unlockSharedData(POWSharedData pow)
+{
+	if (ghMutex)
+	{
+		dbg("%s:  waiting for mutex", __func__);
 		DWORD dwRes = WaitForSingleObject(ghMutex, 1000);
-		if(dwRes != WAIT_OBJECT_0)
+		if (dwRes != WAIT_OBJECT_0)
+		{
+			dbg("%s:	error, waitmutex returned %u", __func__, dwRes);
+			return 0;
+		}
+		dbg("%s:  got mutex", __func__);
+	}
+	dbg("%s:  unlocking...", __func__);
+	if (pow)
+	{
+		unlockFaves(pow);
+		UnmapViewOfFile(pow);
+	}
+	CloseHandle(ghMap);
+	ghMap = NULL;
+
+	if (ghMutex)
+	{
+		dbg("%s:  releasing mutex", __func__);
+		ReleaseMutex(ghMutex);
+		ghMutex = NULL;
+	}
+	return 1;
+}
+
+static int getSharedData(void)
+{
+	int rv = 0;
+	if (ghMutex)
+	{
+		DWORD dwRes = WaitForSingleObject(ghMutex, 200);
+		if (dwRes != WAIT_OBJECT_0)
 			return 0;
 	}
-
 	HANDLE hMap = OpenFileMapping(FILE_MAP_READ, TRUE, OW_SHARED_FILE_MAPPING);
-	if( hMap )
+	if (hMap)
 	{
-		POWSharedData pow = (POWSharedData)MapViewOfFile(hMap, FILE_MAP_READ, 0,0, 0);
-		if( pow )
+		POWSharedData pow = (POWSharedData)MapViewOfFile(hMap, FILE_MAP_READ, 0, 0, 0);
+		if (pow)
 		{
-			CopyMemory(&gOwShared, pow, sizeof(OWSharedData));
-			rv = 1;
+			__try
+			{
+				CopyMemory(&gOwShared, pow, sizeof(OWSharedData));
+				//dbg("%s, openwide.dll : Got shared mem okay", __func__);
+				rv = 1;
+			}
+			__except(EXCEPTION_EXECUTE_HANDLER)
+			{
+				dbg("%s, Exception in getSharedMemory: %d", __func__, exception_code());
+			}
 			UnmapViewOfFile(pow);
 		}
 		else
-			dbg("Failed to get ptr to shared data: %d", GetLastError());
+			dbg("%s, Failed to get ptr to shared data: %d", __func__, GetLastError());
+
 		CloseHandle(hMap);
 	}
 
-	if( ghMutex )
+	if (ghMutex)
 		ReleaseMutex(ghMutex);
 	return rv;
 }
 
-BOOL CALLBACK fpEnumChildren(
-    HWND hwnd,	// handle to child window
-    LPARAM lParam 	// application-defined value
-)
+
+BOOL DLLEXPORT isWinXP(void)
 {
-	static char buf[32];
-	if( GetClassName(hwnd, buf, 31) )
-	{
-		switch(gOwShared.iFocus)
-		{
-			case F_DIRLIST:
-				if( strcmp(buf, WC_LISTVIEWA) == 0 && GetDlgCtrlID(hwnd) == CID_DIRLIST)
-					SetFocus(hwnd);
-				break;
-			case F_FNAME:
-				if( strcmp(buf, WC_COMBOBOXEXA) == 0 && GetDlgCtrlID(hwnd) == CID_FNAME)
-					SetFocus(hwnd);
-				break;
-			case F_FTYPE:
-				if( strcmp(buf, WC_COMBOBOXA) == 0 && GetDlgCtrlID(hwnd) == CID_FTYPE)
-					SetFocus(hwnd);
-				break;
-			case F_PLACES:
-				if( IsWindowVisible(hwnd) && strcmp(buf, TOOLBARCLASSNAMEA) == 0 && GetDlgCtrlID(hwnd) == CID_PLACES)
-					SetFocus(hwnd);
-				break;
-			case F_LOOKIN:
-				if( strcmp(buf, WC_COMBOBOXA) == 0 && GetDlgCtrlID(hwnd) == CID_LOOKIN)
-					SetFocus(hwnd);
-				break;
-		}
-	}
-/*	if( GetDlgCtrlID(hwnd) == 0x47c )
-	{
-		SetWindowText(hwnd, "C:\\code\\");
-		SendMessage((HWND)lParam, WM_COMMAND, MAKEWPARAM(1, BN_CLICKED), (LPARAM)GetDlgItem((HWND)lParam, 1));
-	}*/
-	return 1;
+	return GetDllVersion("Shell32.dll") >= PACKVERSION(6, 00);
 }
 
-
-
-
-static LRESULT CALLBACK SysMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
-{
-    HWND hwnd;
-
-    if(nCode < 0)
-        return CallNextHookEx(ghMsgHook, nCode, wParam, lParam);
-
-	LPMSG	pMsg = (MSG *)lParam;
-	if( pMsg->message < WM_MOUSEFIRST || pMsg->message > WM_MOUSELAST )
-	{
-		dbg("SysMsgProc: %d is code, pMsg: hwnd: %p, message: %d, wp: %x, lp: %x", nCode, pMsg->hwnd, pMsg->message, pMsg->wParam, pMsg->lParam);
-	}
-	if( GetAsyncKeyState(VK_SHIFT) & 0x8000 )
-	{
-		LRESULT lRet = CallNextHookEx(ghSysMsgHook, nCode, wParam, lParam);
-		UnhookWindowsHookEx(ghSysMsgHook);
-		ghSysMsgHook = NULL;
-		return lRet;
-	}
-    switch(pMsg->message)
-    {
-		case WM_MENUSELECT:
-			{
-				dbg("WM_MENUSELECT: %p %d", pMsg->hwnd, LOWORD(pMsg->wParam));
-
-				HMENU hm = (HMENU)pMsg->lParam;
-				if(hm)
-				{
-					static char buf[80];
-					MENUITEMINFO	mii ={0};
-					int nItems = GetMenuItemCount(hm);
-					dbg(" %d items in menu", nItems);
-					for(int i=0; i < nItems; i++)
-					{
-						mii.cbSize = sizeof(mii);
-						mii.fMask = MIIM_FTYPE | MIIM_ID | MIIM_STRING;
-						mii.cch = 79;
-						mii.dwTypeData = (LPTSTR)buf;
-						GetMenuItemInfo(hm, i, TRUE, &mii);
-						dbg(" Item %d:	%.8s, %d", i, buf, mii.wID);
-					}
-				}
-
-				UnhookWindowsHookEx(ghSysMsgHook);
-				ghSysMsgHook = NULL;
-			}
-			break;
-/*		case WM_INITMENUPOPUP:
-			{
-				dbg("WM_INITMENUPOPUP");
-				UnhookWindowsHookEx(ghSysMsgHook);
-				ghSysMsgHook = NULL;
-			}
-			break;*/
-		default:
-			break;
-	}
-
-    // Call the next hook, if there is one
-    return CallNextHookEx(ghSysMsgHook, nCode, wParam, lParam);
-}
-
-
-
-DWORD DLLEXPORT GetDllVersion(LPCTSTR lpszDllName)
-{
-    HINSTANCE hinstDll;
-    DWORD dwVersion = 0;
-	char	szDll[MAX_PATH+1];
-    /* For security purposes, LoadLibrary should be provided with a
-       fully-qualified path to the DLL. The lpszDllName variable should be
-       tested to ensure that it is a fully qualified path before it is used. */
-	if( !PathSearchAndQualify(lpszDllName, szDll, MAX_PATH) )
-		return 0;
-    hinstDll = LoadLibrary(szDll);
-
-    if(hinstDll)
-    {
-        DLLGETVERSIONPROC pDllGetVersion;
-        pDllGetVersion = (DLLGETVERSIONPROC)	GetProcAddress(hinstDll, "DllGetVersion");
-
-        /* Because some DLLs might not implement this function, you
-        must test for it explicitly. Depending on the particular
-        DLL, the lack of a DllGetVersion function can be a useful
-        indicator of the version. */
-
-        if(pDllGetVersion)
-        {
-            DLLVERSIONINFO dvi;
-            HRESULT hr;
-
-            ZeroMemory(&dvi, sizeof(dvi));
-            dvi.cbSize = sizeof(dvi);
-
-            hr = (*pDllGetVersion)(&dvi);
-
-            if(SUCCEEDED(hr))
-            {
-               dwVersion = PACKVERSION(dvi.dwMajorVersion, dvi.dwMinorVersion);
-            }
-        }
-
-        FreeLibrary(hinstDll);
-    }
-    return dwVersion;
-}
-
-BOOL DLLEXPORT	isWinXP(void)
-{
-	return GetDllVersion("Shell32.dll") >= PACKVERSION(6,00);
-}
-
-WORD	viewToCmdID(int	iView)
+static WORD viewToCmdID(int iView)
 {
 	BOOL bXP = isWinXP();
-	switch( iView )
+	switch (iView)
 	{
 		case V_DETAILS:
 			return CMD_2K_DETAILS;
@@ -700,11 +698,10 @@ WORD	viewToCmdID(int	iView)
 	return CMD_2K_LIST;
 }
 
-
-WORD	focusToCtlID(int	iFocus)
+static WORD focusToCtlID(int iFocus)
 {
 	//BOOL bXP = isWinXP();
-	switch( iFocus )
+	switch (iFocus)
 	{
 		case F_DIRLIST:
 			return CID_DIRLIST;
@@ -720,148 +717,104 @@ WORD	focusToCtlID(int	iFocus)
 	return CID_DIRLIST;
 }
 
-int focusDlgItem(HWND hwnd, int iFocus)
+static int focusDlgItem(HWND hwnd, int iFocus)
 {
-	UINT uID = focusToCtlID(gOwShared.iFocus);
-	if( uID == CID_DIRLIST )
+	UINT uID = focusToCtlID(iFocus);
+	if (uID == CID_DIRLIST)
 	{
-		return SetFocus( GetDlgItem( GetDlgItem(hwnd, CID_DIRLISTPARENT) , uID) ) != NULL;
+		return SetFocus(GetDlgItem(GetDlgItem(hwnd, CID_DIRLISTPARENT), uID)) != NULL;
 	}
 	else
-		return SetFocus( GetDlgItem(hwnd, uID)) != NULL;
+		return SetFocus(GetDlgItem(hwnd, uID)) != NULL;
 }
-
-void CALLBACK timerProc(HWND hwnd, UINT uMsg, UINT uID, DWORD dwTime)
+/*
+static void CALLBACK timerProc(HWND hwnd, UINT uMsg, UINT uID, DWORD dwTime)
 {
 	KillTimer(hwnd, 251177);
 	//gbDbg = FALSE;
 	openWide(hwnd);
 //	SendMessage(hwnd, CDM_SETCONTROLTEXT, edt1, (LPARAM)"You've been hooked in!!!");
-}
+}*/
 
+
+static BOOL isOpenSaveDlg(HWND hwNew, LPCREATESTRUCT pcs)
+{
+	static char buf[256];
+	if (GetClassName(hwNew, buf, 255) && pcs->lpszName)
+	{
+		DWORD style = (DWORD)GetWindowLong(hwNew, GWL_STYLE);
+		DWORD exStyle = (DWORD)GetWindowLong(hwNew, GWL_EXSTYLE);
+		if (style == OW_MATCH_STYLE && exStyle == OW_MATCH_EXSTYLE && strcmp(buf, "#32770") == 0 && strcmp(pcs->lpszName, "Open") == 0)
+			return TRUE;
+	}
+	return FALSE;
+/*
+	return findChildWindow(hwNew, CID_FNAME, WC_COMBOBOXEX) 
+	&& findChildWindow(hwNew, CID_FTYPE, WC_COMBOBOX)
+	&& findChildWindow(hwNew, CID_LOOKIN, WC_COMBOBOX);*/
+}
 
 static LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
-    HWND hwnd;
+	if (nCode < 0)
+		return CallNextHookEx(ghMsgHook, nCode, wParam, lParam);
 
-    if(nCode < 0)
-        return CallNextHookEx(ghMsgHook, nCode, wParam, lParam);
-
-    switch(nCode)
-    {
-	case HCBT_CREATEWND:
+	switch (nCode)
+	{
+		case HCBT_CREATEWND:
 		{
-			static char buf[256];
-			HWND	hwNew = (HWND)wParam;
-			CBT_CREATEWND * pcw = (CBT_CREATEWND *)lParam;
-			CREATESTRUCT * pcs = (CREATESTRUCT*) pcw->lpcs;
+			HWND hwNew = (HWND)wParam;
+			CBT_CREATEWND *pcw = (CBT_CREATEWND *)lParam;
+			LPCREATESTRUCT pcs = (LPCREATESTRUCT)pcw->lpcs;
 
-			if( getSharedData() )
+			if (isOpenSaveDlg(hwNew, pcs))
 			{
-				if( GetClassName(hwNew, buf, 255) && pcs->lpszName )
+				if (getSharedData())
 				{
-					DWORD style = (DWORD)GetWindowLong(hwNew, GWL_STYLE);
-					DWORD exStyle = (DWORD)GetWindowLong(hwNew, GWL_EXSTYLE);
-//					dbg("style: %x, exStyle: %x", style, exStyle);
-					if(	style == OW_MATCH_STYLE && exStyle == OW_MATCH_EXSTYLE
-					&&	strcmp(buf, "#32770") == 0
-					&& strcmp(pcs->lpszName, "Open")==0 )
-					{
-						wsprintf(buf, "Patched window %p", hwNew);
-						SendMessage(gOwShared.hwLog, LB_ADDSTRING, 0, (LPARAM)buf);
-						dbg(buf);
-						pcs->style &= ~WS_VISIBLE;
-						ShowWindow(hwNew, SW_HIDE);
-//						dbg("Subclassing now:");
-						subclass(hwNew, wpSubMain, 0);
-//						SetTimer(hwNew, 251177, 20, timerProc);
-					}
+					dbg("%s, Patched window %p", __func__, hwNew);
+					pcs->style &= ~WS_VISIBLE;
+					//ShowWindow(hwNew, SW_HIDE);
+					//dbg("%s, Subclassing now:", __func__);
+					subclass(hwNew, wpSubMain, 0);
 				}
 			}
-
-/*			wsprintf(buf, "CreateWindow: %p, %p(cbtdata)", hwNew, pcw);
-			SendDlgItemMessage(ghwNotify, IDL_LOG, LB_ADDSTRING, 0, (LPARAM)buf);
-
-			wsprintf(buf, "  hInstance: %p", pcs->hInstance);
-			SendDlgItemMessage(ghwNotify, IDL_LOG, LB_ADDSTRING, 0, (LPARAM)buf);
-			wsprintf(buf, "  hMenu: %p", pcs->hMenu);
-			SendDlgItemMessage(ghwNotify, IDL_LOG, LB_ADDSTRING, 0, (LPARAM)buf);
-			wsprintf(buf, "  hwndParent: %p", pcs->hwndParent);
-			SendDlgItemMessage(ghwNotify, IDL_LOG, LB_ADDSTRING, 0, (LPARAM)buf);
-			wsprintf(buf, "  cx: %d, cy: %d", pcs->cx, pcs->cy);
-			SendDlgItemMessage(ghwNotify, IDL_LOG, LB_ADDSTRING, 0, (LPARAM)buf);
-			wsprintf(buf, "  x: %d, y: %d", pcs->x, pcs->y);
-			SendDlgItemMessage(ghwNotify, IDL_LOG, LB_ADDSTRING, 0, (LPARAM)buf);
-			wsprintf(buf, "  style: %x", pcs->style);
-			SendDlgItemMessage(ghwNotify, IDL_LOG, LB_ADDSTRING, 0, (LPARAM)buf);
-			wsprintf(buf, "  name: %p [%.8s]", pcs->lpszName, pcs->lpszName ? pcs->lpszName : "null");
-			SendDlgItemMessage(ghwNotify, IDL_LOG, LB_ADDSTRING, 0, (LPARAM)buf);
-			wsprintf(buf, "  class: %p", pcs->lpszClass);
-			SendDlgItemMessage(ghwNotify, IDL_LOG, LB_ADDSTRING, 0, (LPARAM)buf);
-			wsprintf(buf, "  exStyle: %x", pcs->dwExStyle);
-			SendDlgItemMessage(ghwNotify, IDL_LOG, LB_ADDSTRING, 0, (LPARAM)buf);
-
-
-			if( GetClassName(hwNew, buf, 255) )
-			{
-				SendDlgItemMessage(ghwNotify, IDL_LOG, LB_ADDSTRING, 0, (LPARAM)buf);
-			}
-*/
 		}
-		return 0;
-/*    case HCBT_ACTIVATE:
-		{
-			ghwNotify = getSharedData();
-			CBTACTIVATESTRUCT * pac = (CBTACTIVATESTRUCT *)lParam;
-
-			SendMessage(ghwNotify, WM_USER, 0, (LPARAM)pac->hWndActive);
-
-			hwnd = (HWND)wParam;
-			dbg("Got activate: WPARAM[old window]==(%0lx) LPARAM[CBTACTIVATESTRUCT*](%0lx)->{%s-activate, [new window]%p} ::: Sending to window %p",
-				wParam, lParam, pac->fMouse ? "mouse" : "key", pac->hWndActive, ghwNotify);
-
-			HWND hwPrev = GetActiveWindow();
-		}
-		return 0;*/
-     }
-    // Call the next hook, if there is one
-    return CallNextHookEx(ghMsgHook, nCode, wParam, lParam);
+			return 0;
+	}
+	// Call the next hook, if there is one
+	return CallNextHookEx(ghMsgHook, nCode, wParam, lParam);
 }
 
 
-void releaseSharedMem(void)
+static void releaseSharedMem(void)
 {
 	DWORD dwRes = WaitForSingleObject(ghMutex, INFINITE);
-	if( dwRes == WAIT_OBJECT_0 )
+	if (dwRes == WAIT_OBJECT_0)
 		CloseHandle(ghMutex);
 }
 
-int DLLEXPORT	setHook(HWND hwLB)
+int DLLEXPORT setHook(HWND hwLB)
 {
 	//if( timeoutSeconds == 0 )
-	//	return MessageBox(hwParent, szMsg, szTitle, uType);
-	if(gbHooked)
+	//  return MessageBox(hwParent, szMsg, szTitle, uType);
+	if (gbHooked)
 	{
 		SendMessage(gOwShared.hwLog, LB_ADDSTRING, 0, (LPARAM)"Already hooked");
 		return 1;
 	}
-	else if( !initSharedMem() )
+	else if (!initSharedMem())
 		return FALSE;
 
-//	dbg("List box window handle is %p", hwLB);
-	if(!getSharedData())
+//  dbg("List box window handle is %p", hwLB);
+	if (!getSharedData())
 	{
 		SendMessage(hwLB, LB_ADDSTRING, 0, (LPARAM)"Failed to get shared data!!!");
 		return FALSE;
 	}
 	SendMessage(gOwShared.hwLog, LB_ADDSTRING, 0, (LPARAM)"Setting hook....");
-	ghMsgHook = SetWindowsHookEx(
-						WH_CBT,
-				        CBTProc,
-				        ghInst,
-				        0 //GetCurrentThreadId()            // Only install for THIS thread!!!
-				);
-	if(ghMsgHook != NULL)
+	ghMsgHook = SetWindowsHookEx(WH_CBT, CBTProc, ghInstance, 0	//GetCurrentThreadId()            // Only install for THIS thread!!!
+		);
+	if (ghMsgHook != NULL)
 	{
 		gbHooked = TRUE;
 		SendMessage(gOwShared.hwLog, LB_ADDSTRING, 0, (LPARAM)"Hooked ok!");
@@ -874,16 +827,16 @@ int DLLEXPORT	setHook(HWND hwLB)
 
 int DLLEXPORT rmvHook(void)
 {
-	if( !gbHooked || !ghMsgHook )
+	if (!gbHooked || !ghMsgHook)
 		return 1;
 
-	if( ghSysMsgHook )
+	if (ghSysMsgHook)
 	{
 		UnhookWindowsHookEx(ghSysMsgHook);
 		ghSysMsgHook = NULL;
 	}
 
-	if( ghMsgHook )
+	if (ghMsgHook)
 	{
 		UnhookWindowsHookEx(ghMsgHook);
 		gbHooked = FALSE;
@@ -893,3 +846,264 @@ int DLLEXPORT rmvHook(void)
 	return 1;
 }
 
+
+#ifdef DEBUG_SYSMSG
+static LRESULT CALLBACK SysMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
+{
+	if (nCode < 0)
+		return CallNextHookEx(ghMsgHook, nCode, wParam, lParam);
+
+	LPMSG pMsg = (MSG *)lParam;
+	if (pMsg->message < WM_MOUSEFIRST || pMsg->message > WM_MOUSELAST)
+	{
+		dbg("SysMsgProc: %d is code, pMsg: hwnd: %p, message: %d, wp: %x, lp: %x", nCode, pMsg->hwnd, pMsg->message, pMsg->wParam, pMsg->lParam);
+	}
+	if (GetAsyncKeyState(VK_SHIFT) & 0x8000)
+	{
+		LRESULT lRet = CallNextHookEx(ghSysMsgHook, nCode, wParam, lParam);
+		UnhookWindowsHookEx(ghSysMsgHook);
+		ghSysMsgHook = NULL;
+		return lRet;
+	}
+	switch (pMsg->message)
+	{
+		case WM_MENUSELECT:
+		{
+			dbg("%s, WM_MENUSELECT: %p %d", __func__, pMsg->hwnd, LOWORD(pMsg->wParam));
+
+			HMENU hm = (HMENU)pMsg->lParam;
+			if (hm)
+			{
+				static char buf[80];
+				MENUITEMINFO mii = { 0 };
+				int nItems = GetMenuItemCount(hm);
+				dbg(" %d items in menu", nItems);
+				for (int i = 0; i < nItems; i++)
+				{
+					mii.cbSize = sizeof(mii);
+					mii.fMask = MIIM_FTYPE | MIIM_ID | MIIM_STRING;
+					mii.cch = 79;
+					mii.dwTypeData = (LPTSTR)buf;
+					GetMenuItemInfo(hm, i, TRUE, &mii);
+					dbg(" Item %d:	%.8s, %d", i, buf, mii.wID);
+				}
+			}
+
+			UnhookWindowsHookEx(ghSysMsgHook);
+			ghSysMsgHook = NULL;
+		}
+			break;
+/*		case WM_INITMENUPOPUP:
+			{
+				dbg("WM_INITMENUPOPUP");
+				UnhookWindowsHookEx(ghSysMsgHook);
+				ghSysMsgHook = NULL;
+			}
+			break;*/
+		default:
+			break;
+	}
+
+	// Call the next hook, if there is one
+	return CallNextHookEx(ghSysMsgHook, nCode, wParam, lParam);
+}
+#endif
+
+
+DWORD DLLEXPORT GetDllVersion(LPCTSTR lpszDllName)
+{
+	HINSTANCE hinstDll;
+	DWORD dwVersion = 0;
+	char szDll[MAX_PATH + 1];
+	/* For security purposes, LoadLibrary should be provided with a
+	   fully-qualified path to the DLL. The lpszDllName variable should be
+	   tested to ensure that it is a fully qualified path before it is used. */
+	if (!PathSearchAndQualify(lpszDllName, szDll, MAX_PATH))
+		return 0;
+	hinstDll = LoadLibrary(szDll);
+
+	if (hinstDll)
+	{
+		DLLGETVERSIONPROC pDllGetVersion;
+		pDllGetVersion = (DLLGETVERSIONPROC)GetProcAddress(hinstDll, "DllGetVersion");
+
+		/* Because some DLLs might not implement this function, you
+		   must test for it explicitly. Depending on the particular
+		   DLL, the lack of a DllGetVersion function can be a useful
+		   indicator of the version. */
+
+		if (pDllGetVersion)
+		{
+			DLLVERSIONINFO dvi;
+			HRESULT hr;
+
+			ZeroMemory(&dvi, sizeof(dvi));
+			dvi.cbSize = sizeof(dvi);
+
+			hr = (*pDllGetVersion) (&dvi);
+
+			if (SUCCEEDED(hr))
+			{
+				dwVersion = PACKVERSION(dvi.dwMajorVersion, dvi.dwMinorVersion);
+			}
+		}
+
+		FreeLibrary(hinstDll);
+	}
+	return dwVersion;
+}
+
+
+/*------------------------------------------------------------------------
+ Procedure:     DllMain ID:1
+ Purpose:       Dll entry point.Called when a dll is loaded or
+                unloaded by a process, and when new threads are
+                created or destroyed.
+ Input:         hDllInst: Instance handle of the dll
+                fdwReason: event: attach/detach
+                lpvReserved: not used
+ Output:        The return value is used only when the fdwReason is
+                DLL_PROCESS_ATTACH. True means that the dll has
+                sucesfully loaded, False means that the dll is unable
+                to initialize and should be unloaded immediately.
+ Errors:
+------------------------------------------------------------------------*/
+BOOL DLLEXPORT CALLBACK WINAPI DllMain(HINSTANCE hDLLInst, DWORD fdwReason, LPVOID lpvReserved)
+{
+	switch (fdwReason)
+	{
+		case DLL_PROCESS_ATTACH:
+			// The DLL is being loaded for the first time by a given process.
+			// Perform per-process initialization here.  If the initialization
+			// is successful, return TRUE; if unsuccessful, return FALSE.
+			ghInstance = hDLLInst;
+		//initSharedMem();
+			break;
+		case DLL_PROCESS_DETACH:
+			// The DLL is being unloaded by a given process.  Do any
+			// per-process clean up here, such as undoing what was done in
+			// DLL_PROCESS_ATTACH.  The return value is ignored.
+			if (ghMutex)
+			{
+				CloseHandle(ghMutex);
+				ghMutex = NULL;
+			}
+			ghInstance = NULL;
+			break;
+		case DLL_THREAD_ATTACH:
+			// A thread is being created in a process that has already loaded
+			// this DLL.  Perform any per-thread initialization here.  The
+			// return value is ignored.
+
+			break;
+		case DLL_THREAD_DETACH:
+			// A thread is exiting cleanly in a process that has already
+			// loaded this DLL.  Perform any per-thread clean up here.  The
+			// return value is ignored.
+
+			break;
+	}
+	return TRUE;
+}
+
+
+/*
+static int		cmdIDToView(WORD cmdID)
+{
+	if( !isWinXP() )
+	{
+		switch(cmdID)
+		{
+			case CMD_2K_DETAILS:
+				return V_DETAILS;
+			case CMD_2K_THUMBS:
+				return V_THUMBS;
+			case CMD_2K_LIST:
+				return V_LIST;
+			case CMD_2K_LGICONS:
+				return V_LGICONS;
+			case CMD_2K_SMICONS:
+				return V_SMICONS;
+			default:
+				return V_MAX;
+		}
+	}
+	else
+	{
+		switch(cmdID)
+		{
+			case CMD_XP_DETAILS:
+				return V_DETAILS;
+			case CMD_XP_THUMBS:
+				return V_THUMBS;
+			case CMD_XP_LIST:
+				return V_LIST;
+			case CMD_XP_LGICONS:
+				return V_LGICONS;
+			case CMD_XP_TILES:
+				return V_TILES;
+			default:
+				return V_MAX;
+		}
+	}
+}
+*/
+
+/*
+static LRESULT CALLBACK WINAPI wpSubShellCtl(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
+{
+	//dbg("Shellctl got wmcommand: id %d, code %d", LOWORD(wp), HIWORD(wp));
+	//dbgWM(hwnd, msg, wp, lp);
+
+	static BOOL	bIsXP = FALSE;
+
+	POWSubClassData pow = (POWSubClassData)GetProp(hwnd, OW_PROP_NAME);
+	if( !pow )
+		return DefWindowProc(hwnd, msg, wp, lp);
+
+	switch(msg)
+	{
+		case WM_CREATE:
+			bIsXP = isWinXP();
+			break;
+		case WM_DROPFILES:
+			{
+				HANDLE hDrop = (HANDLE)wp;
+				int nFiles = DragQueryFile(hDrop, (UINT)-1, NULL, 0);
+				dbg("%d files dropped, fwding mesg to %p", nFiles, pow->lpData);
+				return SendMessage((HWND)pow->lpData, msg, wp, lp);
+			}
+			break;
+		case WM_COMMAND:
+			//dbg("Shellctl got wmcommand: id %d, code %d", LOWORD(wp), HIWORD(wp));
+			{
+				int view = cmdIDToView(LOWORD(wp));
+				if( view >= 0 && view < V_MAX )
+				{
+					dbg("User reset view to %d", view);
+					if( getSharedData() )
+					{
+						gOwShared.iView = view;
+						//setSharedData();
+					}
+				}
+			}
+			break;
+		case WM_NOTIFY:
+			{
+//				LPNMHDR pHdr = (LPNMHDR)lp;
+//				dbg("Shellctl got WMNOTIFY: id %d, code %d", pHdr->idFrom, pHdr->code);
+			}
+			break;
+		case WM_DESTROY:
+			{
+				WNDPROC wpOrig = pow->wpOrig;
+				unsubclass(hwnd);
+				dbg("SHell view being destroyed");
+				return CallWindowProc(wpOrig, hwnd, msg, wp, lp);
+			}
+			break;
+	}
+	return CallWindowProc(pow->wpOrig, hwnd, msg, wp, lp);
+}
+*/

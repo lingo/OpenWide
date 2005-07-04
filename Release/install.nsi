@@ -12,7 +12,7 @@
 SetCompressor lzma
 
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
-OutFile "OpenWide1-1Setup.exe"
+OutFile "OpenWide1-1b2Setup.exe"
 LoadLanguageFile "${NSISDIR}\Contrib\Language files\English.nlf"
 InstallDir "$PROGRAMFILES\OpenWide"
 Icon "${NSISDIR}\Contrib\Graphics\Icons\arrow2-install.ico"
@@ -20,10 +20,11 @@ UninstallIcon "${NSISDIR}\Contrib\Graphics\Icons\arrow2-uninstall.ico"
 InstallDirRegKey HKLM "${PRODUCT_DIR_REGKEY}" ""
 DirText "Setup will install $(^Name) in the following folder.$\r$\n$\r$\nTo install in a different folder, click Browse and select another folder."
 LicenseText "If you accept all the terms of the agreement, choose I Agree to continue. You must accept the agreement to install $(^Name)."
-LicenseData "readme.txt"
+LicenseData "license.txt"
 ShowInstDetails show
 ShowUnInstDetails show
-
+XPStyle on
+InstallColors /windows
 Section "MainSection" SEC01
   SetOutPath "$INSTDIR"
   SetOverwrite ifnewer
@@ -32,14 +33,14 @@ Section "MainSection" SEC01
   CreateShortCut "$SMPROGRAMS\OpenWide\OpenWide.lnk" "$INSTDIR\openwide.exe"
   CreateShortCut "$DESKTOP\OpenWide.lnk" "$INSTDIR\openwide.exe"
   File "openwidedll.dll"
-  File "readme.txt"
-  CreateShortCut "$SMPROGRAMS\OpenWide\ReadMe.lnk" "$INSTDIR\readme.txt"
+  File "openwide.chm"
+  CreateShortCut "$SMPROGRAMS\OpenWide\Help.lnk" "$INSTDIR\openwide.chm"
 SectionEnd
 
 Section -AdditionalIcons
   WriteIniStr "$INSTDIR\${PRODUCT_NAME}.url" "InternetShortcut" "URL" "${PRODUCT_WEB_SITE}"
   CreateShortCut "$SMPROGRAMS\OpenWide\Website.lnk" "$INSTDIR\${PRODUCT_NAME}.url"
-  CreateShortCut "$SMPROGRAMS\OpenWide\Uninstall.lnk" "$INSTDIR\uninst.exe" "" "${NSISDIR}\Contrib\Graphics\Icons\arrow2-uninstall.ico"
+  CreateShortCut "$SMPROGRAMS\OpenWide\Uninstall.lnk" "$INSTDIR\uninst.exe"
 SectionEnd
 
 Section -Post
@@ -62,18 +63,24 @@ FunctionEnd
 Function un.onInit
   MessageBox MB_ICONQUESTION|MB_YESNO|MB_DEFBUTTON2 "Are you sure you want to completely remove OpenWide and all of its components?" IDYES +2
   Abort
+  FindWindow $0 "#32770" "Open Wide!"
+  StrCmp $0 "0" isntOpen isOpen
+isOpen:
+  MessageBox MB_OK "Please close OpenWide and all other open applications before uninstalling"
+  Abort
+isntOpen:
 FunctionEnd
 
 Section Uninstall
   Delete "$INSTDIR\${PRODUCT_NAME}.url"
   Delete "$INSTDIR\uninst.exe"
-  Delete "$INSTDIR\readme.txt"
+  Delete "$INSTDIR\openwide.chm"
   Delete "$INSTDIR\openwidedll.dll"
   Delete "$INSTDIR\openwide.exe"
 
   Delete "$SMPROGRAMS\OpenWide\Uninstall.lnk"
   Delete "$SMPROGRAMS\OpenWide\Website.lnk"
-  Delete "$SMPROGRAMS\OpenWide\ReadMe.lnk"
+  Delete "$SMPROGRAMS\OpenWide\Help.lnk"
   Delete "$DESKTOP\OpenWide.lnk"
   Delete "$SMPROGRAMS\OpenWide\OpenWide.lnk"
   
