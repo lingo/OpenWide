@@ -39,16 +39,6 @@ enum	CommandIDsXP
 	CMD_XP_THUMBS = 28717,//30982,
 };
 
-typedef struct OWSharedData
-{
-	HWND		hwLog;
-	POINT		ptOrg;
-	SIZE		szDim;
-	int			iView;
-	int			iFocus;
-	BOOL		bStartMin;
-} OWSharedData, *POWSharedData;
-
 #define PACKVERSION(major,minor) MAKELONG(minor,major)
 
 #define	OW_MATCH_STYLE			0x82CC20C4
@@ -67,10 +57,43 @@ typedef struct OWSharedData
 
 // functions from file C:\Data\Code\C\openwide\openwidedll.c //
 int rmvHook(void);
-int setHook(HWND hwLB);
+int setHook(void);
 
 DWORD GetDllVersion(LPCTSTR lpszDllName);
 BOOL isWinXP(void);
+
+
+
+
+
+
+typedef struct OWSharedData
+{
+	HWND		hwListener;
+	POINT		ptOrg;
+	SIZE		szDim;
+	
+	int			iView;
+	int			iFocus;
+
+	BOOL		bStartMin : 1;
+	BOOL		bDisable  : 1;
+	BOOL		bShowIcon : 1;
+	BOOL		bPadding  : 29;
+
+//	HHOOK		hHook;
+	int			refCount;
+	int			iCloseMsg;
+} OWSharedData, *POWSharedData;
+
+
+
+
+
+
+
+
+
 
 #endif	// C__Data_Code_C_openwide_openwidedll_proto_h
 

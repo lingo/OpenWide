@@ -13,10 +13,10 @@ CC = pocc.exe#
 AS = ml.exe#
 RC = porc.exe#
 LINK = polink.exe#
-CCFLAGS =  -Tx86-coff -Ot -W1 -Gz -Ze -D_WIN32_IE=0x0500 -D_WIN32_NT=0x0500 -DCOBJMACROS #
-ASFLAGS =  -W1 -Cu -c -nologo -coff#
+CCFLAGS =  -Tx86-coff -Zi -MT -Os -W1 -Gz -Ze -D_WIN32_IE=0x0600 -D_WIN32_WINNT=0x0500 -DCOBJMACROS -DDEBUG #
+ASFLAGS =  -Zi -W1 -Cu -c -nologo -coff#
 RCFLAGS =  #
-LINKFLAGS =  -subsystem:windows -machine:ix86  kernel32.lib user32.lib gdi32.lib comctl32.lib comdlg32.lib advapi32.lib delayimp.lib openwidedll.lib shell32.lib ole32.lib shlwapi.lib uuid.lib#
+LINKFLAGS =  -debug -debugtype:both -subsystem:windows -machine:ix86  kernel32.lib user32.lib gdi32.lib comctl32.lib comdlg32.lib advapi32.lib delayimp.lib openwidedll.lib shell32.lib ole32.lib shlwapi.lib uuid.lib#
 
 .SILENT:  
   
@@ -26,7 +26,9 @@ LINKFLAGS =  -subsystem:windows -machine:ix86  kernel32.lib user32.lib gdi32.lib
 # 
 "$(POC_PROJECT_PATH)\openwide.exe": \
   "$(POC_PROJECT_PATH)\output\openwide.res" \
-  "$(POC_PROJECT_PATH)\output\openwide.obj"  
+  "$(POC_PROJECT_PATH)\output\openwide.obj" \
+  "$(POC_PROJECT_PATH)\output\psDlg.obj" \
+  "$(POC_PROJECT_PATH)\output\owUtil.obj"  
   $(LINK) $(LINKFLAGS) -out:"$@" $**
 
 # 
@@ -34,8 +36,8 @@ LINKFLAGS =  -subsystem:windows -machine:ix86  kernel32.lib user32.lib gdi32.lib
 # 
 "$(POC_PROJECT_PATH)\output\openwide.res": \
   "$(POC_PROJECT_PATH)\openwide.rc" \
-  "$(POC_PROJECT_PATH)\openwide.h" \
-  "$(POC_PROJECT_PATH)\16x16multi.ico"  
+  "$(POC_PROJECT_PATH)\openwideres.h" \
+  "$(POC_PROJECT_PATH)\multi.ico"  
   $(RC) $(RCFLAGS) "$!" -Fo"$@"
 
 # 
@@ -44,5 +46,26 @@ LINKFLAGS =  -subsystem:windows -machine:ix86  kernel32.lib user32.lib gdi32.lib
 "$(POC_PROJECT_PATH)\output\openwide.obj": \
   "$(POC_PROJECT_PATH)\openwide.c" \
   "$(POC_PROJECT_PATH)\openwidedll.h" \
-  "$(POC_PROJECT_PATH)\openwide.h"  
+  "$(POC_PROJECT_PATH)\openwideres.h" \
+  "$(POC_PROJECT_PATH)\owutil.h"  
+  $(CC) $(CCFLAGS) "$!" -Fo"$@"
+
+# 
+# Build psDlg.obj.
+# 
+"$(POC_PROJECT_PATH)\output\psDlg.obj": \
+  "$(POC_PROJECT_PATH)\psDlg.c" \
+  "$(POC_PROJECT_PATH)\openwidedll.h" \
+  "$(POC_PROJECT_PATH)\openwideres.h" \
+  "$(POC_PROJECT_PATH)\owutil.h"  
+  $(CC) $(CCFLAGS) "$!" -Fo"$@"
+
+# 
+# Build owUtil.obj.
+# 
+"$(POC_PROJECT_PATH)\output\owUtil.obj": \
+  "$(POC_PROJECT_PATH)\owUtil.c" \
+  "$(POC_PROJECT_PATH)\openwidedll.h" \
+  "$(POC_PROJECT_PATH)\openwideres.h" \
+  "$(POC_PROJECT_PATH)\owutil.h"  
   $(CC) $(CCFLAGS) "$!" -Fo"$@"

@@ -2,7 +2,7 @@
 
 ; HM NIS Edit Wizard helper defines
 !define PRODUCT_NAME "OpenWide"
-!define PRODUCT_VERSION "1.1"
+!define PRODUCT_VERSION "1.1b3"
 !define PRODUCT_PUBLISHER "Lingo"
 !define PRODUCT_WEB_SITE "http://lingo.atspace.com"
 !define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\openwide.exe"
@@ -12,7 +12,7 @@
 SetCompressor lzma
 
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
-OutFile "OpenWide1-1Setup.exe"
+OutFile "OpenWide1_1b3Setup.exe"
 LoadLanguageFile "${NSISDIR}\Contrib\Language files\English.nlf"
 InstallDir "$PROGRAMFILES\OpenWide"
 Icon "${NSISDIR}\Contrib\Graphics\Icons\arrow2-install.ico"
