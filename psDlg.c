@@ -1,7 +1,9 @@
 #include	<windows.h>
+#include	<shlwapi.h>
 #include	"openwidedll.h"
 #include	"openwideres.h"
 #include	"owutil.h"
+#include	"owSharedUtil.h"
 
 #include	"openwide_proto.h"
 
@@ -41,15 +43,13 @@ int initPrefs(HWND hwnd)
 	CheckDlgButton(hwnd, IDC_WSTARTUP, isStartupApp(hwnd));
 	CheckDlgButton(hwnd, IDC_LOG, BST_CHECKED);
 
-	BOOL bMinimize = FALSE;
 	if( !waitForMutex() )
 		return 0;
 
-	bMinimize = gPowData->bStartMin;
 	CheckDlgButton(hwnd, IDC_STARTMIN, gPowData->bStartMin);
+	CheckDlgButton(hwnd, IDC_SHOWICON, gPowData->bShowIcon);
 
-	if( ghMutex )
-		ReleaseMutex(ghMutex);
+	releaseMutex();
 
 /*	if( bMinimize )
 	{
@@ -71,6 +71,7 @@ static void onPrefsTabCommand(HWND hwnd, WPARAM wp, LPARAM lp)
 	{
 		case IDC_WSTARTUP:
 		case IDC_STARTMIN:
+		case IDC_SHOWICON:
 			setTabChanged(hwnd, HIWORD(wp)==BN_CLICKED);
 			break;
 	}
@@ -106,16 +107,19 @@ static BOOL CALLBACK wpPrefs(HWND hwnd, UINT uMsg, WPARAM wp, LPARAM lp)
 									return FALSE;
 								}
 								
-								gPowData->bStartMin = IsDlgButtonChecked(hwnd, IDC_STARTMIN) == BST_CHECKED;
+								gPowData->bStartMin = (IsDlgButtonChecked(hwnd, IDC_STARTMIN) == BST_CHECKED);
+								BOOL bShowIcon = gPowData->bShowIcon = (IsDlgButtonChecked(hwnd, IDC_SHOWICON) == BST_CHECKED);
 								BOOL bWinStart = IsDlgButtonChecked(hwnd, IDC_WSTARTUP) == BST_CHECKED;
 							
 								savePrefsToRegistry();
-
-								if( ghMutex )
-									ReleaseMutex(ghMutex);
+								
+								releaseMutex();
 
 								setStartupApp(hwnd, bWinStart);
-
+								if( bShowIcon )
+									addTrayIcon(ghwMain);
+								else
+									remTrayIcon(ghwMain);
 								SETDLGRESULT(hwnd, PSNRET_NOERROR);
 								return TRUE;
 							}
@@ -134,11 +138,107 @@ static BOOL CALLBACK wpPrefs(HWND hwnd, UINT uMsg, WPARAM wp, LPARAM lp)
 	return 0;
 }
 
+static int enumExcludes(HKEY hkRoot, const char *szKey, DWORD dwType, LPVOID pParm)
+{
+	if( dwType == REG_DWORD )
+		SendMessage((HWND)pParm, LB_ADDSTRING, 0, (LPARAM)szKey);
+	return 1;
+}
+
+static int	addExcludes2LB(HWND hwnd, UINT uID)
+{
+	HWND hwLB = GetDlgItem(hwnd, uID);
+	if( !hwLB )
+		return 0;
+	HKEY hk = regOpenKey(HKEY_CURRENT_USER, OW_REGKEY_EXCLUDES_NAME);
+	if( hk )
+	{
+		regEnumValues(hk, enumExcludes, (LPVOID)hwLB);
+		regCloseKey(hk);
+		return 1;
+	}
+	return 0;
+}
+
+static int initExcludes(HWND hwnd)
+{
+	return addExcludes2LB(hwnd, IDL_EXCLUDES);
+}
+
+static int addExclude(HWND hwnd)
+{
+	const char *szEx = Prompt_File_Name(OPEN, hwnd, "Executable Files\0*.exe;*.com", "Choose program to exclude");
+	if( szEx )
+	{
+//		PathStripPath((char *)szEx);
+		int idx = SendDlgItemMessage(hwnd, IDL_EXCLUDES, LB_FINDSTRINGEXACT, -1, (LPARAM)szEx);
+		if( idx != LB_ERR )
+			Warn("This program is already excluded");
+		else
+			SendDlgItemMessage(hwnd, IDL_EXCLUDES, LB_ADDSTRING, 0, (LPARAM)szEx);
+	}
+	return 1;
+}
+
+static int rmvExclude(HWND hwnd)
+{
+	int idx = SendDlgItemMessage(hwnd, IDL_EXCLUDES, LB_GETCURSEL, 0,0);
+	if( idx != LB_ERR )
+		SendDlgItemMessage(hwnd, IDL_EXCLUDES, LB_DELETESTRING, idx, 0);
+	return 1;
+}
+
+static int	saveExcludes2Registry(HWND hwnd, UINT uID)
+{
+	HWND hwLB = GetDlgItem(hwnd, uID);
+	if( !hwLB )
+		return 0;
+	static char szKey[32];
+	regDeleteKey(HKEY_CURRENT_USER, OW_REGKEY_EXCLUDES_NAME);
+	HKEY hk = regCreateKey(HKEY_CURRENT_USER, OW_REGKEY_EXCLUDES_NAME);
+	if( hk )
+	{
+		int num = SendMessage(hwLB, LB_GETCOUNT,0,0);
+		if( num != LB_ERR )
+		{
+			for(int i=0; i < num; i++)
+			{
+				char *szEx = lbGetItemText(hwLB, i);
+				if( szEx )
+				{
+					regWriteDWORD(hk, szEx, 1);
+					free(szEx);
+				}
+			}
+		}
+		regCloseKey(hk);
+		return 1;
+	}
+	return 0;
+}
+
+static void onExTabCmd(HWND hwnd, WPARAM wp, LPARAM lp)
+{
+	switch(LOWORD(wp))
+	{
+		case IDB_ADDEX:
+			addExclude(hwnd);
+			break;
+		case IDB_RMVEX:
+			rmvExclude(hwnd);
+			break;
+	}
+}
+
 static BOOL CALLBACK wpExcludes(HWND hwnd, UINT uMsg, WPARAM wp, LPARAM lp)
 {
 	switch (uMsg)
 	{
 		case WM_INITDIALOG:
+			initExcludes(hwnd);
+			break;
+		case WM_COMMAND:
+			onExTabCmd(hwnd, wp, lp);
 			break;
 		case WM_NOTIFY:
 			{
@@ -153,6 +253,7 @@ static BOOL CALLBACK wpExcludes(HWND hwnd, UINT uMsg, WPARAM wp, LPARAM lp)
 							return FALSE;
 						case PSN_APPLY:
 							{
+								saveExcludes2Registry(hwnd, IDL_EXCLUDES);
 								SETDLGRESULT(hwnd, PSNRET_NOERROR);
 								return TRUE;
 							}
@@ -277,8 +378,7 @@ static int initOSTab(HWND hwnd)
 	SendDlgItemMessage(hwnd, IDCB_FOCUS, CB_SETCURSEL, gPowData->iFocus, 0);
 
 /// released shared data
-	if( ghMutex )
-		ReleaseMutex(ghMutex);
+	releaseMutex();
 	return 1;
 }
 
@@ -362,9 +462,8 @@ static BOOL CALLBACK wpOSDlgs(HWND hwnd, UINT uMsg, WPARAM wp, LPARAM lp)
 								}
 
 								savePrefsToRegistry();
-
-								if( ghMutex )
-									ReleaseMutex(ghMutex);
+								
+								releaseMutex();
 								SETDLGRESULT(hwnd, PSNRET_NOERROR);
 								return TRUE;
 							}
@@ -430,6 +529,7 @@ static void fillSheet(PROPSHEETPAGE * psp, int idDlg, DLGPROC pfnDlgProc)
 /** Function source : C:\Data\Code\C\Proto\prefsdlg.c */
 int CALLBACK WINAPI initPropSheets(HWND hwnd, UINT msg, LPARAM lp)
 {
+	dbg("initPropSheets: %p, %d", hwnd, msg);
 	if (msg != PSCB_INITIALIZED)
 		return 0;
 	ghwPropSheet = hwnd;
@@ -441,26 +541,24 @@ int CALLBACK WINAPI initPropSheets(HWND hwnd, UINT msg, LPARAM lp)
 HWND showDlg(HWND hwParent)
 {
 	PROPSHEETHEADER psh;
-	PROPSHEETPAGE pages[2];
+	PROPSHEETPAGE pages[4];
 
 	int k=0;
 	fillSheet(&pages[k++], IDD_OSDIALOGS, wpOSDlgs);
-//	fillSheet(&pages[k++], IDD_EXCLUDES, wpExcludes);
+	fillSheet(&pages[k++], IDD_EXCLUDES, wpExcludes);
 //	fillSheet(&pages[k++], IDD_APPS, wpApps);
 	fillSheet(&pages[k++], IDD_PREFS, wpPrefs);
 
 	memset(&psh, 0, sizeof(PROPSHEETHEADER));
 	psh.dwSize = sizeof(PROPSHEETHEADER);
-	psh.dwFlags = PSH_PROPSHEETPAGE | PSH_USEICONID | PSH_USECALLBACK | PSH_MODELESS;	// |
+	psh.dwFlags = PSH_PROPSHEETPAGE | PSH_USEHICON | PSH_USECALLBACK | PSH_MODELESS;	// |
 																		// PSH_NOAPPLYNOW
 																		// //
 																		// |
 																		// PSH_USECALLBACK;
 	psh.hwndParent = hwParent;
 	psh.hInstance = ghInstance;
-	psh.pszIcon = (LPSTR) MAKEINTRESOURCE(IDI_TRAY);	// LoadImage(hInst, ,
-													// IMAGE_ICON, 16,16,
-													// LR_SHARED);
+	psh.hIcon = 	ghIconSm;
 	psh.pszCaption = (LPSTR) "OpenWide Settings";
 	psh.nPages = k;	//sizeof(pages) / sizeof(PROPSHEETPAGE);
 	psh.ppsp = (LPCPROPSHEETPAGE) pages;

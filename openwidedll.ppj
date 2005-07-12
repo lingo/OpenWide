@@ -13,10 +13,10 @@ CC = pocc.exe#
 AS = ml.exe#
 RC = porc.exe#
 LINK = polink.exe#
-CCFLAGS =  -Tx86-coff -Zi -MT -Os -W2 -Gz -Ze -D_WIN32_IE=0x0500 -D_WIN32_WINNT=0x0500 #
-ASFLAGS =  -Zi -W1 -Cu -c -nologo -coff#
+CCFLAGS =  -Tx86-coff -MT -Os -W2 -Gz -Ze -D_WIN32_IE=0x0500 -D_WIN32_WINNT=0x0500 -DBUILDNO=1 #
+ASFLAGS =  -W1 -Cu -c -nologo -coff#
 RCFLAGS = #
-LINKFLAGS =  -debug -debugtype:both -subsystem:windows -machine:ix86 -dll kernel32.lib user32.lib gdi32.lib comctl32.lib comdlg32.lib advapi32.lib delayimp.lib shell32.lib shlwapi.lib#
+LINKFLAGS =  -subsystem:windows -machine:ix86 -dll kernel32.lib user32.lib gdi32.lib comctl32.lib comdlg32.lib advapi32.lib delayimp.lib shell32.lib shlwapi.lib#
 
 .SILENT:  
   
@@ -26,7 +26,8 @@ LINKFLAGS =  -debug -debugtype:both -subsystem:windows -machine:ix86 -dll kernel
 # 
 "$(POC_PROJECT_PATH)\openwidedll.dll": \
   "$(POC_PROJECT_PATH)\output\openwidedll.obj" \
-  "$(POC_PROJECT_PATH)\output\owDLLUtil.obj"  
+  "$(POC_PROJECT_PATH)\output\owDLLUtil.obj" \
+  "$(POC_PROJECT_PATH)\output\owSharedUtil.obj"  
   $(LINK) $(LINKFLAGS) -out:"$@" $**
 
 # 
@@ -36,7 +37,8 @@ LINKFLAGS =  -debug -debugtype:both -subsystem:windows -machine:ix86 -dll kernel
   "$(POC_PROJECT_PATH)\openwidedll.c" \
   "$(POC_PROJECT_PATH)\openwidedll.h" \
   "$(POC_PROJECT_PATH)\openwideres.h" \
-  "$(POC_PROJECT_PATH)\owDllInc.h"  
+  "$(POC_PROJECT_PATH)\owDllInc.h" \
+  "$(POC_PROJECT_PATH)\owSharedUtil.h"  
   $(CC) $(CCFLAGS) "$!" -Fo"$@"
 
 # 
@@ -47,4 +49,13 @@ LINKFLAGS =  -debug -debugtype:both -subsystem:windows -machine:ix86 -dll kernel
   "$(POC_PROJECT_PATH)\openwidedll.h" \
   "$(POC_PROJECT_PATH)\openwideres.h" \
   "$(POC_PROJECT_PATH)\owDllInc.h"  
+  $(CC) $(CCFLAGS) "$!" -Fo"$@"
+
+# 
+# Build owSharedUtil.obj.
+# 
+"$(POC_PROJECT_PATH)\output\owSharedUtil.obj": \
+  "$(POC_PROJECT_PATH)\owSharedUtil.c" \
+  "$(POC_PROJECT_PATH)\openwidedll.h" \
+  "$(POC_PROJECT_PATH)\owSharedUtil.h"  
   $(CC) $(CCFLAGS) "$!" -Fo"$@"

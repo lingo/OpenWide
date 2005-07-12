@@ -15,6 +15,7 @@
 #define	IDCB_VIEW	4019
 #define	IDC_STARTMIN	4020
 #define	IDC_WSTARTUP	4021
+#define	IDC_SHOWICON	4024
 #define	IDI_TRAY	8001
 
 
@@ -24,3 +25,7 @@
 
 #define IDD_APPS  1003
 #define IDD_EXCLUDES  1006
+
+#define IDL_EXCLUDES  4004
+#define IDB_ADDEX  4006
+#define IDB_RMVEX  4007

@@ -49,6 +49,9 @@ enum	CommandIDsXP
 #define	OW_PROP_NAME			("openwidedll_window_property")
 #define	OW_OVERLAY_CLASS		("openwidedll_overlay_window_class")
 
+#define	OW_REGKEY_NAME	("Software\\Lingo\\OpenWide")
+#define	OW_REGKEY_EXCLUDES_NAME	("Software\\Lingo\\OpenWide\\Excludes")
+
 #define	OW_2K_MINWIDTH			565
 #define	OW_2K_MINHEIGHT			349
 

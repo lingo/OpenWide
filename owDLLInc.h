@@ -41,13 +41,10 @@ void CALLBACK timerProc(HWND hwnd, UINT uMsg, UINT uID, DWORD dwTime);
 
 
 /* Copied on : Tue Jul 12 05:30:55 2005 */
-void dbg(char *szError, ...);
 int focusDlgItem(HWND hwnd, int iFocus);
 WORD focusToCtlID(int iFocus);
 BOOL CALLBACK fpEnumChildren(HWND hwnd, LPARAM lParam);
 HWND  getChildWinFromPt(HWND hwnd);
-DWORD DLLEXPORT GetDllVersion(LPCTSTR lpszDllName);
-BOOL DLLEXPORT isWinXP(void);
 void releaseMutex(void);
 int subclass(HWND hwnd, WNDPROC wpNew, LPARAM lpData);
 int unsubclass(HWND hwnd);

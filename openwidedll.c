@@ -9,6 +9,7 @@
 #include	"openwidedll.h"
 #include	"openwideres.h"
 #include	"owDllInc.h"
+#include	"owSharedUtil.h"
 
 
 HINSTANCE		ghInst = NULL;
@@ -19,7 +20,7 @@ HHOOK			ghMsgHook	= NULL, ghSysMsgHook = NULL;
 
 OWSharedData	gOwShared; // stores copy of shared mem for access to non-pointer datas without extended blocking
 
-BOOL DLLEXPORT WINAPI DLLPROC(HINSTANCE hDLLInst, DWORD fdwReason, LPVOID lpvReserved)
+BOOL __declspec(dllexport) WINAPI DLLPROC(HINSTANCE hDLLInst, DWORD fdwReason, LPVOID lpvReserved)
 {
     switch (fdwReason)
     {
@@ -73,18 +74,6 @@ int		openWide(HWND hwnd)
 	AppendMenu(hm, MF_STRING, OW_EXPLORE_CMDID, "&Locate current folder with Explorer...");
 	AppendMenu(hm, MF_STRING, OW_ABOUT_CMDID, "&About OpenWide...");
 
-
-/*
-//// FIND name of Calling app ////
-
-	char *szApp = malloc( MAX_PATH+1 );
-	if( szApp )
-	{
-		GetModuleFileName(NULL, szApp, MAX_PATH);
-		dbg("Module: %s", szApp);
-		free(szApp);
-	}
-*/
 /*
 	HWND hwShellCtl = GetDlgItem(hwnd, CID_DIRLISTPARENT);
 	hwShellCtl = GetDlgItem(hwShellCtl, 1);
@@ -306,6 +295,18 @@ LRESULT CALLBACK WINAPI wpSubShellCtl(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 	return CallWindowProc(pow->wpOrig, hwnd, msg, wp, lp);
 }
 
+static BOOL isExcluded(const char *szApp)
+{
+	BOOL bEx = FALSE;
+	HKEY hk = regOpenKey(HKEY_CURRENT_USER, OW_REGKEY_EXCLUDES_NAME);
+	if( hk )
+	{
+		regGetDWORD(hk, szApp, &bEx);
+		regCloseKey(hk);
+	}
+	return bEx;
+}
+
 
 static LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
@@ -336,8 +337,19 @@ static LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam)
 				{
 					BOOL	bTakeOver = TRUE;
 
+				//// FIND name of Calling app ////
+					char *szApp = malloc( MAX_PATH+1 );
+					if( szApp && GetModuleFileName(NULL, szApp, MAX_PATH) )
+					{
+						if( isExcluded(szApp) )
+							bTakeOver = FALSE;
+						dbg("DLL: Module: %s", szApp);
+						free(szApp);
+					}
+
 					dbg("DLL: Found O&S dlg %p, attempting access to shared mem", hwNew);
-					if( openSharedMem() )
+
+					if( bTakeOver && openSharedMem() )
 					{
 						dbg("DLL: Opened shared memory");
 						if( gpSharedMem->bDisable )
@@ -413,7 +425,7 @@ int getSharedData(void)
 }
 
 
-int DLLEXPORT	setHook(void)
+int __declspec(dllexport)	setHook(void)
 {
 	if(ghMsgHook != NULL)
 	{
@@ -440,7 +452,7 @@ int DLLEXPORT	setHook(void)
 }
 
 
-int DLLEXPORT rmvHook(void)
+int __declspec(dllexport) rmvHook(void)
 {
 	if( !ghMsgHook )
 		return 1;

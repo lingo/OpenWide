@@ -9,19 +9,22 @@
 #include	"openwidedll.h"
 #include	"openwideres.h"
 #include	"owutil.h"
+#include	"owSharedUtil.h"
 #include	"openwide_proto.h"
 
 
 enum	TrayCommands	{	IDM_ABOUT = 100, IDM_SETTINGS, IDM_QUIT };
 
-HWND		ghwMain = NULL, ghwPropSheet=NULL;
-HINSTANCE	ghInstance = NULL;
-HWND		ghwListBox = NULL;
+HWND		ghwMain 	= NULL, ghwPropSheet	= NULL;
+HINSTANCE	ghInstance	= NULL;
+//HWND		ghwListBox	= NULL;
 
-POWSharedData 	gPowData = NULL;
-HANDLE			ghSharedMem =  NULL;
-HANDLE			ghMutex = NULL;
-UINT			giCloseMessage	=	0;
+HICON		ghIconLG		= NULL,	ghIconSm	= NULL;
+
+POWSharedData 	gPowData	= NULL;
+HANDLE			ghSharedMem = NULL;
+HANDLE			ghMutex 	= NULL;
+UINT			giCloseMessage	= 0;
 
 int initSharedMem(HWND hwnd)
 {
@@ -87,7 +90,7 @@ int initSharedMem(HWND hwnd)
 	if( pRData )
 		free(pRData);
 
-	ReleaseMutex(ghMutex);
+	releaseMutex();
 	return rVal;
 }
 
@@ -225,24 +228,25 @@ int initListener(HWND hwnd)
 	if(!initSharedMem(hwnd))
 		return 0;
 
-	BOOL bMinimize = FALSE;
+	BOOL bMinimize = FALSE, bIcon = TRUE;
 
 // wait for then lock shared data
 	if( !waitForMutex() )
 			return 0;
 
-	bMinimize = gPowData->bStartMin;
+	bMinimize	= gPowData->bStartMin;
+	bIcon		= gPowData->bShowIcon;
 
 /// released shared data
-	if( ghMutex )
-		ReleaseMutex(ghMutex);
+	releaseMutex();
 
-	addTrayIcon(hwnd);
+	if(bIcon)
+		addTrayIcon(hwnd);
 
 	if( bMinimize )
 		ghwPropSheet = NULL;
 	else
-		ghwPropSheet = showDlg(NULL);
+		ghwPropSheet = showDlg(hwnd);
 
 	if( !setHook() )
 	{
@@ -302,8 +306,7 @@ void	doQuit(void)
 			dbg("Posting quit message");
 			PostQuitMessage(0);
 		}
-		if( ghMutex )
-			ReleaseMutex(ghMutex);
+		releaseMutex();
 	}
 	remTrayIcon(ghwMain);
 }
@@ -364,8 +367,7 @@ LRESULT WINAPI CALLBACK wpListener(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 					dbg("OWApp: refCount is %d", gPowData->refCount);
 					if( gPowData->refCount == 0 && gPowData->bDisable)
 						PostQuitMessage(0);
-					if( ghMutex )
-						ReleaseMutex(ghMutex);
+					releaseMutex();
 				}
 			}
 			return DefWindowProc(hwnd, msg, wp, lp);
@@ -427,8 +429,7 @@ BOOL WINAPI CALLBACK wpPlacement(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 
 int		addTrayIcon(HWND hwnd)
 {
-	HICON hIcon = (HICON)LoadImage(ghInstance, MAKEINTRESOURCE(IDI_TRAY), IMAGE_ICON, 16,16, LR_SHARED | LR_VGACOLOR);
-	return Add_TrayIcon( hIcon, "OpenWide\r\nLeft-Click to show...", hwnd, WM_TRAYICON, 0);
+	return Add_TrayIcon( ghIconSm, "OpenWide\r\nLeft-Click to show...", hwnd, WM_TRAYICON, 0);
 }
 
 void	remTrayIcon(HWND hwnd)
@@ -447,6 +448,8 @@ HWND	createListenerWindow(void)
 		wc.hInstance = ghInstance;
 		wc.lpfnWndProc = wpListener;
 		wc.lpszClassName = "Lingo.OpenWide.Listener";
+		wc.hIcon = ghIconLG;
+		wc.hIconSm = ghIconSm;
 		bRegd = (RegisterClassEx(&wc) != 0);
 	}
 	return CreateWindowEx( WS_EX_NOACTIVATE, "Lingo.OpenWide.Listener", "Lingo.OpenWide",
@@ -455,20 +458,6 @@ HWND	createListenerWindow(void)
 
 int createWin(void)
 {	
-	WNDCLASSEX wc = {0};
-	wc.cbSize = sizeof(wc);
-	wc.hInstance = ghInstance;
-
-	if(!GetClassInfoEx(NULL, WC_DIALOG, &wc))
-		return 0;
-	wc.hIconSm = (HICON)LoadImage(ghInstance, MAKEINTRESOURCE(IDI_TRAY), IMAGE_ICON, 16,16, LR_SHARED | LR_VGACOLOR);
-	if( !RegisterClassEx(&wc) )
-		return 0;
-
-/*	ghwMain = CreateDialog(ghInstance, MAKEINTRESOURCE(IDD_MAIN), NULL, wpMain);
-	if( !ghwMain )
-		Warn("Unable to create main dialog: %s", geterrmsg());
-	return (ghwMain!=NULL);*/
 	ghwMain = createListenerWindow();
 	return 1;
 }
@@ -478,6 +467,8 @@ int ow_init(void)
 	HRESULT hRes = CoInitialize(NULL);
 	if( hRes != S_OK && hRes != S_FALSE )
 		return 0;
+	ghIconSm = (HICON)LoadImage(ghInstance, MAKEINTRESOURCE(IDI_TRAY), IMAGE_ICON, 16,16, LR_SHARED | LR_VGACOLOR);
+	ghIconLG = (HICON)LoadIcon(ghInstance, MAKEINTRESOURCE(IDI_TRAY));
 	if( !createWin() )
 		return 0;
 	return 1;
@@ -504,11 +495,7 @@ int WINAPI WinMain(HINSTANCE hi, HINSTANCE hiPrv, LPSTR fakeCmdLine, int iShow)
 		CloseHandle(hMutex);
 		HWND hw = FindWindowEx(NULL, NULL, "Lingo.OpenWide.Listener", "Lingo.OpenWide");
 		if(hw)
-		{
-			SendMessage(hw, WM_TRAYICON, 0, WM_LBUTTONUP);
-			FlashWindow(hw, TRUE);
-			SetForegroundWindow(hw);
-		}
+			SendMessage(hw, WM_TRAYICON, 0, WM_LBUTTONDBLCLK);
 		return 0;
 	}
 	ghInstance = hi;

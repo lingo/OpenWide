@@ -9,6 +9,7 @@
 #include	"openwidedll.h"
 #include	"openwideres.h"
 #include	"owutil.h"
+#include	"owSharedUtil.h"
 
 int		dlgUnits2Pix(HWND hwnd, int units, BOOL bHorz)
 {
@@ -26,28 +27,6 @@ int		pix2DlgUnits(HWND hwnd, int pix, BOOL bHorz)
 	return (bHorz) ? (pix / r.right) : (pix / r.bottom);
 }
 
-
-const char * geterrmsg(void)
-{
-	static char szMsg[256];
-	FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM |
-		FORMAT_MESSAGE_IGNORE_INSERTS,
-		NULL,
-		GetLastError(),
-		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
-		(LPTSTR) szMsg,
-		255,
-		NULL
-	);
-	int len = strlen(szMsg) - 1;
-	if(len < 0) return NULL;
-	while( szMsg[len] == '\r' || szMsg[len] == '\n'){
-		szMsg[len--] = 0;
-		if(len < 0) break;
-	}
-	return szMsg;
-}
-
 /* Copied from Pro2
  * Function source : C:\Code\lcc\Proto\util.c */
 void Error(char *szError, ...)
@@ -61,30 +40,6 @@ void Error(char *szError, ...)
 	va_end(vl);
 	exit(-1);
 }
-
-/* Copied from Pro2
- * Function source : C:\Code\lcc\Proto\util.c */
-void Warn(char *szError, ...)
-{
-	char		szBuff[256];
-	va_list		vl;
-	va_start(vl, szError);
-    _vsnprintf(szBuff, 256, szError, vl);	// print error message to string
-	OutputDebugString(szBuff);
-	MessageBox(NULL, szBuff, "Error", MB_OK); // show message
-	va_end(vl);
-}
-
-void dbg(char *szError, ...)
-{
-	char		szBuff[256];
-	va_list		vl;
-	va_start(vl, szError);
-    _vsnprintf(szBuff, 256, szError, vl);	// print error message to string
-	OutputDebugString(szBuff);
-	va_end(vl);
-}
-
 
 UINT APIENTRY OFNHookProcOldStyle(
     HWND hdlg,	// handle to the dialog box window
@@ -155,78 +110,21 @@ char *Prompt_File_Name(int iFlags, HWND hwOwner, const char *pszFilter, const ch
 }
 
 
-
-/* Copied by pro2 : (c)2004 Luke Hudson */
-/** Function source : C:\Data\Code\C\Proto\registry.c */
-void regCloseKey(HKEY hk)
+/* Copied on : Tue Jul 12 18:03:16 2005 */
+/** Function source : C:\Data\Code\C\resh\listview.c */
+TCHAR *lbGetItemText(HWND hwLB, int iItem)
 {
-	RegCloseKey(hk);
-}
-
-/** Function source : C:\Data\Code\C\Proto\registry.c */
-HKEY regCreateKey(HKEY hkParent, const char *szSubKey){
-	LONG res;
-	HKEY hk;
-	res = RegCreateKeyEx(hkParent, szSubKey, 0L, NULL, REG_OPTION_NON_VOLATILE,
-							KEY_READ | KEY_WRITE, NULL, &hk, NULL);
-	return ( res == ERROR_SUCCESS ) ? hk : NULL;
-}
-
-/** Function source : C:\Data\Code\C\Proto\registry.c */
-BYTE *regReadBinaryData(HKEY hkRoot, const char *szValueName){
-	DWORD dwType, dwSize = 0;
-	LONG res;
-	res = RegQueryValueEx(hkRoot, szValueName, NULL, &dwType, NULL, &dwSize);
-	if( res == ERROR_SUCCESS	&&	dwType == REG_BINARY	&&	dwSize > 0)
-	{
-		BYTE * buf = malloc(dwSize);
-		if(!buf)
-			return NULL;
-		res = RegQueryValueEx(hkRoot, szValueName, NULL, NULL, buf, &dwSize);
-		if( res == ERROR_SUCCESS )
-			return buf;
-	}
-	return NULL;
-}
-
-/** Function source : C:\Data\Code\C\Proto\registry.c */
-int regWriteBinaryData(HKEY hkRoot, const char *szValue, BYTE *buf, int bufSize ){
-	LONG res;
-	res = RegSetValueEx(hkRoot, szValue, 0L, REG_BINARY, buf, bufSize);
-	return (res == ERROR_SUCCESS);
-}
-
-/* Copied by pro2 : (c)2004 Luke Hudson */
-/** Function source : C:\Data\Code\C\Proto\registry.c */
-DWORD regReadDWORD(HKEY hkRoot, const char *szValueName, int *pSuccess)
-{
-	LONG res;
-	DWORD dwType, dwSize = 0;
-	DWORD dword = 0L;
-
-	if( pSuccess )
-		*pSuccess = 0;
-	res = RegQueryValueEx(hkRoot, szValueName, NULL, &dwType, NULL, &dwSize);
-	if( res == ERROR_SUCCESS	&& (dwType == REG_DWORD || REG_DWORD_LITTLE_ENDIAN)		&& dwSize == sizeof(DWORD) )
-	{
-		res = RegQueryValueEx(hkRoot, szValueName, NULL, NULL, (BYTE*)&dword, &dwSize);
-		if( res == ERROR_SUCCESS && pSuccess)
-			*pSuccess = 1;
-	}
-	return dword;
-}
-
-
-
-/* Copied by pro2 : (c)2004 Luke Hudson */
-/** Function source : C:\Data\Code\C\Proto\registry.c */
-int regWriteDWORD(HKEY hkRoot, const char *szValue, DWORD dwData)
-{
-	LONG res;
-	res = RegSetValueEx(hkRoot, (LPCTSTR)szValue, 0L, REG_DWORD,
-						(BYTE *)&dwData,
-						sizeof(dwData));
-	return (res == ERROR_SUCCESS);
+	TCHAR *szText = NULL;
+	int len;
+	len = SendMessage(hwLB, LB_GETTEXTLEN, iItem, 0) + 1;
+	if(len <= 1)
+		return NULL;
+	szText = malloc(len+1 * sizeof(char));
+	if(!szText) return NULL;
+	len = SendMessage(hwLB, LB_GETTEXT, iItem, (LPARAM)szText);
+	if( len <= 0 )
+		free(szText);
+	return szText;
 }
 
 /** Function source : C:\Data\Code\C\ExtassE\util.c */
@@ -383,7 +281,9 @@ BOOL	waitForMutex(void)
 {
 	DWORD dwRes;
 	if( !ghMutex )
+	{
 		ghMutex = OpenMutex(SYNCHRONIZE, FALSE, OW_MUTEX_NAME);
+	}
 	if( ghMutex )
 	{
 		dwRes = WaitForSingleObject(ghMutex, INFINITE);
@@ -394,6 +294,7 @@ BOOL	waitForMutex(void)
 				break;
 			case WAIT_ABANDONED:
 			default:
+				dbg("Mutex wait failed");
 				return FALSE;
 		}
 	}
@@ -403,5 +304,8 @@ BOOL	waitForMutex(void)
 void	releaseMutex(void)
 {
 	if( ghMutex )
+	{	
 		ReleaseMutex(ghMutex);
+	}
 }
+

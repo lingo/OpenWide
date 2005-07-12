@@ -70,11 +70,6 @@ HWND 	getChildWinFromPt(HWND hwnd)
 	return hw;
 }
 
-/** Function source : C:\Data\Code\C\openwide\openwidedll.c */
-BOOL DLLEXPORT	isWinXP(void)
-{
-	return GetDllVersion("Shell32.dll") >= PACKVERSION(6,00);
-}
 
 /** Function source : C:\Data\Code\C\openwide\openwidedll.c */
 int	subclass(HWND hwnd, WNDPROC wpNew, LPARAM lpData)
@@ -163,17 +158,6 @@ void	releaseMutex(void)
 	}
 }
 
-void dbg(char *szError, ...)
-{
-	char		szBuff[256];
-	va_list		vl;
-	va_start(vl, szError);
-    vsnprintf(szBuff, 256, szError, vl);	// print error message to string
-	OutputDebugString(szBuff);
-	va_end(vl);
-}
-
-
 
 BOOL CALLBACK fpEnumChildren(HWND hwnd, LPARAM lParam)
 {
@@ -211,49 +195,3 @@ BOOL CALLBACK fpEnumChildren(HWND hwnd, LPARAM lParam)
 	}*/
 	return 1;
 }
-
-/* Copied on : Tue Jul 12 04:10:23 2005 */
-/** Function source : C:\Data\Code\C\openwide\openwidedll.c */
-DWORD DLLEXPORT GetDllVersion(LPCTSTR lpszDllName)
-{
-    HINSTANCE hinstDll;
-    DWORD dwVersion = 0;
-	char	szDll[MAX_PATH+1];
-    /* For security purposes, LoadLibrary should be provided with a
-       fully-qualified path to the DLL. The lpszDllName variable should be
-       tested to ensure that it is a fully qualified path before it is used. */
-	if( !PathSearchAndQualify(lpszDllName, szDll, MAX_PATH) )
-		return 0;
-    hinstDll = LoadLibrary(szDll);
-
-    if(hinstDll)
-    {
-        DLLGETVERSIONPROC pDllGetVersion;
-        pDllGetVersion = (DLLGETVERSIONPROC)	GetProcAddress(hinstDll, "DllGetVersion");
-
-        /* Because some DLLs might not implement this function, you
-        must test for it explicitly. Depending on the particular
-        DLL, the lack of a DllGetVersion function can be a useful
-        indicator of the version. */
-
-        if(pDllGetVersion)
-        {
-            DLLVERSIONINFO dvi;
-            HRESULT hr;
-
-            ZeroMemory(&dvi, sizeof(dvi));
-            dvi.cbSize = sizeof(dvi);
-
-            hr = (*pDllGetVersion)(&dvi);
-
-            if(SUCCEEDED(hr))
-            {
-               dwVersion = PACKVERSION(dvi.dwMajorVersion, dvi.dwMinorVersion);
-            }
-        }
-
-        FreeLibrary(hinstDll);
-    }
-    return dwVersion;
-}
-
