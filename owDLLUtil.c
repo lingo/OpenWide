@@ -195,3 +195,37 @@ BOOL CALLBACK fpEnumChildren(HWND hwnd, LPARAM lParam)
 	}*/
 	return 1;
 }
+
+
+static int CALLBACK WINAPI enumFindChildWindow(HWND hwnd, PFindChildData pData)
+{
+	UINT uID = GetDlgCtrlID(hwnd);
+	static char buf[256];
+	if (uID == pData->uID)
+	{
+		//dbg("Found window %p with id %d", hwnd, uID);
+		if (GetClassName(hwnd, buf, 256) && strcmp(buf, pData->szClass) == 0)
+		{
+			pData->hwFound = hwnd;
+			return 0;
+		}
+		//else
+		//dbg("Window's class is %s - not what's wanted", buf);
+	}
+	return 1;
+}
+
+HWND findChildWindow(HWND hwParent, UINT uID, const char *szClass)
+{
+	FindChildData fData;
+
+	fData.szClass = szClass;
+	fData.uID = uID;
+	fData.hwFound = NULL;
+
+	//dbg("findChildWindow: seeking \"%s\", %d", szClass, uID);
+
+	EnumChildWindows(hwParent, (WNDENUMPROC)enumFindChildWindow, (LPARAM) & fData);
+
+	return fData.hwFound;
+}
