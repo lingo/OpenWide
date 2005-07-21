@@ -1,0 +1,76 @@
+@import "nav.css";
+
+body {
+	font-family: Tahoma, Verdana, Helvetica, sans-serif; 
+	color: #FFFFFF; 
+	background-color: #333399
+	margin: 0;
+	padding: 0;
+}
+
+a {  
+	font: bold;
+	text-decoration: underline;
+	color: #FFFFFF;
+}
+
+a:hover { 
+	background-color: #3366CC;
+	color: #FFFF00;
+} 
+
+a:active {
+	color: #FFCC33;
+}
+
+a:visited {
+	color: #CCCCCC;
+	text-decoration: none;
+}
+
+.tableHeader
+{
+ background-color: #7575dd;
+ color: #000000;
+ font-weight: bold;
+}
+
+.byline
+{
+	font-weight: bold;
+	font-size: smaller;
+	padding-left: 3em;
+	margin-top: -4ex; 
+}
+
+EM
+{
+	font-style: normal;
+	font-weight: bold;
+	padding-left: 0.5em;
+	padding-right: 0.5em;
+	font-variant: small-caps;
+	font-family: monospace;
+}
+
+DT
+{
+	margin-left:	1em;
+	border-bottom: 1px dotted white;
+	font-size: small;
+	font-weight:	bold;
+	font-family: monospace;
+	margin-right:	10em;
+}
+
+DD
+{
+	padding-bottom: 2ex;
+	padding-top:	0.5ex;
+	margin-right:	10em;
+}
+
+P
+{
+	margin-right: 4em;
+}

@@ -13,12 +13,12 @@ enum	FocusMode	{F_DIRLIST, F_FNAME, F_FTYPE, F_PLACES, F_LOOKIN, F_MAX};
 enum	CtrlIDs2k
 {
 	CID_DIRLIST = 0x1,
+	CID_TOOLBAR = 0x1,
 	CID_FNAME	= 0x47C,
 	CID_FTYPE	= 0x470,
 	CID_PLACES	= 0x4A0,
 	CID_LOOKIN	= 0x471,
 	CID_DIRLISTPARENT = 0x461,
-	CID_OVERLAY = 0x1234
 };
 
 enum	CommandIDs2k
@@ -39,6 +39,16 @@ enum	CommandIDsXP
 	CMD_XP_THUMBS = 28717,//30982,
 };
 
+
+enum OW_COMMANDS {
+	OW_ABOUT_CMDID = 0x1010,
+	OW_EXPLORE_CMDID = 0x1020,
+	OW_TBUTTON_CMDID = 0x1030,
+	OW_ADDFAV_CMDID = 0x1040,
+	OW_FAVOURITE_CMDID = 0x1050,
+	OW_SHOWDESK_CMDID	= 0x1060,
+};
+
 #define PACKVERSION(major,minor) MAKELONG(minor,major)
 
 #define	OW_MATCH_STYLE			0x82CC20C4
@@ -57,6 +67,9 @@ enum	CommandIDsXP
 
 #define	OW_XP_MINWIDTH			563
 #define	OW_XP_MINHEIGHT			419
+
+#define	OW_LISTVIEW_STYLE	(LVS_EX_FULLROWSELECT)
+
 
 // functions from file C:\Data\Code\C\openwide\openwidedll.c //
 int rmvHook(void);

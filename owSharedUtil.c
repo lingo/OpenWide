@@ -1,4 +1,4 @@
-#include	<windows.h>
+	#include	<windows.h>
 #include	<objbase.h>
 #include	<shobjidl.h>
 #include	<shlguid.h>
@@ -22,6 +22,26 @@ void dbg(char *szError, ...)
 	OutputDebugString(szBuff);
 	va_end(vl);
 #endif
+}
+
+/* Copied on : Wed Jul 13 23:03:36 2005 */
+/** Function source : C:\Data\Code\C\Proto\gui.c */
+char * getDlgItemText(HWND hwnd, UINT uID)
+{
+	HWND hwCtl = GetDlgItem(hwnd, uID);
+	if(! IsWindow(hwCtl) )
+		return NULL;
+	int len = GetWindowTextLength(hwCtl);
+	if( len <= 0 )
+		return NULL;
+	char * buf = malloc(len+1);
+	if(!buf)
+		return NULL;
+	len = GetWindowText(hwCtl, buf, len+1);
+	if( len > 0 )
+		return buf;
+	free(buf);
+	return NULL;
 }
 
 

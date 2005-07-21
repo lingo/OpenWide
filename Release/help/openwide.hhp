@@ -1,0 +1,19 @@
+; This project file has been recreated
+; by KeyTools. It is only an approximation
+; of the original project file.
+
+[OPTIONS]
+Compiled file=openwide.chm
+Default topic=openwide.htm
+Default Window=Main
+
+[FILES]
+images\odlg.gif
+images\ow.gif
+images\owtray.gif
+license.htm
+openwide.htm
+style.css
+
+[WINDOWS]
+Main="OpenWide Help",,,"openwide.htm","openwide.htm",,,,,0x2020,,0x4c,[0,0,600,600],0x100f0000,,,1,,0,

@@ -29,3 +29,4 @@
 #define IDL_EXCLUDES  4004
 #define IDB_ADDEX  4006
 #define IDB_RMVEX  4007
+#define IDI_TBICON  8002

@@ -10,11 +10,6 @@
 #define DLLPROC	DllMain
 #endif
 
-#define	OW_ABOUT_CMDID		0x1010
-#define	OW_EXPLORE_CMDID	0x1020
-#define	OW_LISTVIEW_STYLE	(LVS_EX_FULLROWSELECT)
-
-
 typedef struct OWSubClassData
 {
 	WNDPROC		wpOrig;
@@ -22,6 +17,23 @@ typedef struct OWSubClassData
 	BOOL		bSet;
 } OWSubClassData, *POWSubClassData;
 
+
+typedef struct FindChildData {
+	const char *szClass;
+	UINT uID;
+	HWND hwFound;
+} FindChildData, *PFindChildData;
+
+
+typedef struct FavLink
+{
+	//struct FavLink * next;
+	int			idCmd;
+	int			iLen;
+	char		szFav[MAX_PATH+4];
+} FavLink, *PFavLink;
+
+typedef int (*FPFaveIter)(PFavLink pFav, void * pData);
 
 extern HINSTANCE 	ghInst;
 extern HHOOK 		ghMsgHook, ghSysMsgHook;
@@ -40,7 +52,8 @@ void releaseSharedMem(void);
 void CALLBACK timerProc(HWND hwnd, UINT uMsg, UINT uID, DWORD dwTime);
 
 
-/* Copied on : Tue Jul 12 05:30:55 2005 */
+/* Copied on : Wed Jul 13 22:15:28 2005 */
+HWND findChildWindow(HWND hwParent, UINT uID, const char *szClass);
 int focusDlgItem(HWND hwnd, int iFocus);
 WORD focusToCtlID(int iFocus);
 BOOL CALLBACK fpEnumChildren(HWND hwnd, LPARAM lParam);

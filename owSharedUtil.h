@@ -11,9 +11,9 @@
 
 typedef int (*RegValEnumProc)(HKEY hk, const TCHAR *keyName, DWORD dwType, LPVOID pparam);
 
-
-// functions from file C:\Data\Code\C\openwide\owSharedUtil.c //
+/* Copied on : Wed Jul 13 23:04:03 2005 */
 void dbg(char *szError, ...);
+char * getDlgItemText(HWND hwnd, UINT uID);
 DWORD GetDllVersion(LPCTSTR lpszDllName);
 const char * geterrmsg(void);
 BOOL isWinXP(void);
@@ -28,7 +28,6 @@ BYTE *regReadBinaryData(HKEY hkRoot, const char *szValueName);
 DWORD regReadDWORD(HKEY hkRoot, const char *szValueName, int *pSuccess);
 char *regReadSZ(HKEY hk, const char *szValueName);
 int regWriteBinaryData(HKEY hkRoot, const char *szValue, BYTE *buf, int bufSize );
-int regWriteDWORD(HKEY hkRoot, const char *szValue, DWORD dwData);
 int regWriteDWORD(HKEY hkRoot, const char *szValue, DWORD dwData);
 int regWriteSZ(HKEY hkRoot, const char *szValueName, const char *szData);
 void Warn(char *szError, ...);
