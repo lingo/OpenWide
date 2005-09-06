@@ -102,7 +102,7 @@ static BOOL CALLBACK wpPrefs(HWND hwnd, UINT uMsg, WPARAM wp, LPARAM lp)
 							{
 								if(!waitForMutex())
 								{
-									Warn("Couldn't get access to shared memory!");
+									//Warn("Couldn't get access to shared memory!");
 									SETDLGRESULT(hwnd, PSNRET_INVALID);
 									return FALSE;
 								}
@@ -429,7 +429,7 @@ static BOOL CALLBACK wpOSDlgs(HWND hwnd, UINT uMsg, WPARAM wp, LPARAM lp)
 							{
 								if(!waitForMutex())
 								{
-									Warn("Couldn't get access to shared memory!");
+									//Warn("Couldn't get access to shared memory!");
 									SETDLGRESULT(hwnd, PSNRET_INVALID);
 									return FALSE;
 								}
@@ -529,7 +529,7 @@ static void fillSheet(PROPSHEETPAGE * psp, int idDlg, DLGPROC pfnDlgProc)
 /** Function source : C:\Data\Code\C\Proto\prefsdlg.c */
 int CALLBACK WINAPI initPropSheets(HWND hwnd, UINT msg, LPARAM lp)
 {
-	dbg("initPropSheets: %p, %d", hwnd, msg);
+	//dbg("initPropSheets: %p, %d", hwnd, msg);
 	if (msg != PSCB_INITIALIZED)
 		return 0;
 	ghwPropSheet = hwnd;

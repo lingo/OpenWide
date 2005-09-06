@@ -1,4 +1,4 @@
-OpenWide 1.1b by Luke Hudson
+OpenWide 1.3b by Luke Hudson
 
 About
 ~~~~~

@@ -193,7 +193,7 @@ BOOL fileExists (const char *path)
 		if (errCode == ERROR_FILE_NOT_FOUND
 				|| errCode == ERROR_PATH_NOT_FOUND)
 			return FALSE;
-		dbg ("fileExists? getLastError gives %d", errCode);
+		//dbg ("fileExists? getLastError gives %d", errCode);
 	}
 	return TRUE;
 }
@@ -294,7 +294,7 @@ BOOL	waitForMutex(void)
 				break;
 			case WAIT_ABANDONED:
 			default:
-				dbg("Mutex wait failed");
+				//dbg("Mutex wait failed");
 				return FALSE;
 		}
 	}

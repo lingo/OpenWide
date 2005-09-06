@@ -82,7 +82,6 @@ int initSharedMem(HWND hwnd)
 			gPowData->bDisable = 0;
 			gPowData->refCount = 0;
 			giCloseMessage = gPowData->iCloseMsg = RegisterWindowMessage("Lingo.OpenWide.ProcessFinished.Message");
-			dbg("Close message is %x", giCloseMessage);
 			rVal = 1;
 		}
 	}
@@ -98,18 +97,18 @@ int initSharedMem(HWND hwnd)
 
 void releaseSharedMem(void)
 {
-	dbg("DLL: Waiting for mutex");
+//	dbg("DLL: Waiting for mutex");
 	if( ghMutex )
 	{
 		DWORD dwRes = WaitForSingleObject(ghMutex, INFINITE);
 		if(dwRes != WAIT_OBJECT_0)
 		{
-			dbg("DLL: Failed to get ownership of mutex in releaseSharedMem!!!");
+//			dbg("DLL: Failed to get ownership of mutex in releaseSharedMem!!!");
 			return;
 		}
 	}
 
-	dbg("DLL: Releasing file mapping");
+//	dbg("DLL: Releasing file mapping");
 	if( ghSharedMem )
 	{
 		if( gPowData );
@@ -298,12 +297,12 @@ void	doQuit(void)
 	//rmvHook();
 	if( waitForMutex() )
 	{
-		dbg("Setting bDisable");
+//		dbg("Setting bDisable");
 		gPowData->bDisable = TRUE;
-		dbg("refCount is %d", gPowData->refCount);
+//		dbg("refCount is %d", gPowData->refCount);
 		if(gPowData->refCount == 0)
 		{
-			dbg("Posting quit message");
+//			dbg("Posting quit message");
 			PostQuitMessage(0);
 		}
 		releaseMutex();
@@ -354,17 +353,17 @@ LRESULT WINAPI CALLBACK wpListener(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			}
 			break;
 		case WM_DESTROY:
-			dbg("OWApp: listener destroying");
+//			dbg("OWApp: listener destroying");
 			rmvHook();
 			releaseSharedMem();
 			break;
 		default:
 			if( msg == giCloseMessage )
 			{
-				dbg("OWApp: Received dll close msg");
+//				dbg("OWApp: Received dll close msg");
 				if( waitForMutex() )
 				{
-					dbg("OWApp: refCount is %d", gPowData->refCount);
+//					dbg("OWApp: refCount is %d", gPowData->refCount);
 					if( gPowData->refCount == 0 && gPowData->bDisable)
 						PostQuitMessage(0);
 					releaseMutex();
@@ -429,7 +428,7 @@ BOOL WINAPI CALLBACK wpPlacement(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 
 int		addTrayIcon(HWND hwnd)
 {
-	return Add_TrayIcon( ghIconSm, "OpenWide\r\nLeft-Click to show...", hwnd, WM_TRAYICON, 0);
+	return Add_TrayIcon( ghIconSm, "OpenWide\r\nRight-Click for menu...", hwnd, WM_TRAYICON, 0);
 }
 
 void	remTrayIcon(HWND hwnd)
@@ -523,7 +522,7 @@ int WINAPI WinMain(HINSTANCE hi, HINSTANCE hiPrv, LPSTR fakeCmdLine, int iShow)
 			ghwPropSheet=NULL;
 		}
 	}
-	dbg("OWApp: Shutting down");
+//	dbg("OWApp: Shutting down");
 	ow_shutdown();
 	return 0;
 }

@@ -8,7 +8,7 @@
 #include	<stdio.h>
 #include	<dlgs.h>
 #include	"openwidedll.h"
-#include	"openwideres.h"
+#include	"openwidedllres.h"
 #include	"owDllInc.h"
 #include	"owSharedUtil.h"
 
@@ -21,21 +21,7 @@ HHOOK			ghMsgHook	= NULL, ghSysMsgHook = NULL;
 
 OWSharedData	gOwShared; // stores copy of shared mem for access to non-pointer datas without extended blocking
 
-BOOL __declspec(dllexport) WINAPI DLLPROC(HINSTANCE hDLLInst, DWORD fdwReason, LPVOID lpvReserved)
-{
-    switch (fdwReason)
-    {
-        case DLL_PROCESS_ATTACH:
-			ghInst = hDLLInst;
-            break;
-        case DLL_PROCESS_DETACH:
-			ghInst = NULL;
-	        break;
-		default:
-            break;
-    }
-    return TRUE;
-}
+
 
 int addIcon2TB(HWND hwTB, HICON hIcn)
 {
@@ -47,7 +33,7 @@ int addIcon2TB(HWND hwTB, HICON hIcn)
 		int idxNew = ImageList_AddIcon(hImgList, hIcn);
 		if (idxNew == -1)
 		{
-			dbg("%s, Error adding to imglist: %s", __func__, geterrmsg());
+			//dbg("%s, Error adding to imglist: %s", __func__, geterrmsg());
 			return -1;
 		}
 		else
@@ -107,8 +93,8 @@ static void dropMenu(HWND hwnd, HWND hwTB, UINT uiItem)
 
 	HMENU hm = CreatePopupMenu();
 	AppendMenu(hm, MF_STRING, OW_EXPLORE_CMDID, "&Locate current folder with Explorer...");
-	SetMenuDefaultItem(hm, OW_EXPLORE_CMDID, FALSE);
 	AppendMenu(hm, MF_STRING, OW_SHOWDESK_CMDID, "Show &Desktop [for Gabriel]...");
+	SetMenuDefaultItem(hm, OW_SHOWDESK_CMDID, FALSE);
 /*
 	AppendMenu(hm, MF_STRING, OW_ADDFAV_CMDID, "Add &Favourite");
 	SetMenuDefaultItem(hm, OW_ADDFAV_CMDID, FALSE);
@@ -211,7 +197,7 @@ int		openWide(HWND hwnd)
 	focusDlgItem(hwnd, gOwShared.iFocus);
 
 	// debug hook, to find menu cmd IDs
-#ifdef	DEBUG
+#ifdef	HOOK_SYSMSG
 	dbg("Hooking SYSMSG...");
 	ghSysMsgHook = SetWindowsHookEx(
 						WH_SYSMSGFILTER,
@@ -306,18 +292,21 @@ LRESULT CALLBACK WINAPI wpSubMain(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 				case OW_ABOUT_CMDID:
 					MessageBox(hwnd, "OpenWide is written by Luke Hudson. (c)2005", "About OpenWide", MB_OK);
 					return 0;
+				case OW_TBUTTON_CMDID:
 				case OW_SHOWDESK_CMDID:
 					showDesktop(hwnd);
 					break;
-				case OW_TBUTTON_CMDID:
 				case OW_EXPLORE_CMDID:
 				{
 					char *szParm = "/select,";
 					wsprintf(buffer, szParm);
 					int len = strlen(szParm);
-					len = SendMessage(hwnd, CDM_GETFOLDERPATH, MAX_PATH - len, (LPARAM) (buffer + len));
+					LPARAM lpBuf = (LPARAM)buffer + (LPARAM)len;
+					dbg("CDM_GET..PATH, cbSize=%d, buffer = %p", MAX_PATH-len, lpBuf);
+					len = SendMessage(hwnd, CDM_GETFOLDERPATH, MAX_PATH - len, lpBuf); //(LPARAM)(char *)((unsigned int)buffer + (unsigned int)len));
 					if (len)
 					{
+						dbg("Getfolderpath returned len %d, path: \"%s\"",len, buffer);
 						ShellExecute(hwnd, NULL, "explorer.exe", buffer, NULL, SW_SHOWNORMAL);
 					}
 				}
@@ -474,16 +463,16 @@ s*/
 			return 0;
 		case WM_DESTROY:
 			{
-				dbg("DLL: DESTROY");
+				//dbg("DLL: DESTROY");
 				if( openSharedMem() )
 				{
-					dbg("DLL: Opened shared memory");
+					//dbg("DLL: Opened shared memory");
 					if( --gpSharedMem->refCount < 0 )
 						gpSharedMem->refCount = 0;
-					dbg("DLL: dec'd refCount to %d, posting msg %x to app window %p", gpSharedMem->refCount, gpSharedMem->iCloseMsg, gpSharedMem->hwListener);
+					//dbg("DLL: dec'd refCount to %d, posting msg %x to app window %p", gpSharedMem->refCount, gpSharedMem->iCloseMsg, gpSharedMem->hwListener);
 					PostMessage( gpSharedMem->hwListener, gpSharedMem->iCloseMsg, 0,0);
 					closeSharedMem();
-					dbg("DLL: Closed shared memory");
+					//dbg("DLL: Closed shared memory");
 				}
 				WNDPROC wpOrig = pow->wpOrig;
 				unsubclass(hwnd);
@@ -506,7 +495,7 @@ LRESULT CALLBACK WINAPI wpSubShellCtl(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			{
 				HANDLE hDrop = (HANDLE)wp;
 				int nFiles = DragQueryFile(hDrop, (UINT)-1, NULL, 0);
-				dbg("%d files dropped, fwding mesg to %p", nFiles, pow->lpData);
+				////dbg("%d files dropped, fwding mesg to %p", nFiles, pow->lpData);
 				return SendMessage((HWND)pow->lpData, msg, wp, lp);
 			}
 			break;
@@ -514,7 +503,7 @@ LRESULT CALLBACK WINAPI wpSubShellCtl(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			{
 				WNDPROC wpOrig = pow->wpOrig;
 				unsubclass(hwnd);
-				dbg("SHell view being destroyed");
+				//dbg("SHell view being destroyed");
 				return CallWindowProc(wpOrig, hwnd, msg, wp, lp);
 			}
 			break;
@@ -570,22 +559,22 @@ static LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam)
 					{
 						if( isExcluded(szApp) )
 							bTakeOver = FALSE;
-						dbg("DLL: Module: %s", szApp);
+						//dbg("DLL: Module: %s", szApp);
 						free(szApp);
 					}
 
-					dbg("DLL: Found O&S dlg %p, attempting access to shared mem", hwNew);
+					///dbg("DLL: Found O&S dlg %p, attempting access to shared mem", hwNew);
 
 					if( bTakeOver && openSharedMem() )
 					{
-						dbg("DLL: Opened shared memory");
+						//dbg("DLL: Opened shared memory");
 						if( gpSharedMem->bDisable )
 							bTakeOver = FALSE;
 						else
 							gpSharedMem->refCount++;
-						dbg("DLL: Inc'd refCount to %d", gpSharedMem->refCount);
+						//dbg("DLL: Inc'd refCount to %d", gpSharedMem->refCount);
 						closeSharedMem();
-						dbg("DLL: Closed shared memory");
+						//dbg("DLL: Closed shared memory");
 					}
 					if( bTakeOver )
 					{
@@ -652,7 +641,7 @@ int getSharedData(void)
 }
 
 
-int __declspec(dllexport)	setHook(void)
+int DLLEXPORT setHook(void)
 {
 	if(ghMsgHook != NULL)
 	{
@@ -662,24 +651,24 @@ int __declspec(dllexport)	setHook(void)
 	if(!getSharedData())
 	{
 //		SendMessage(hwLB, LB_ADDSTRING, 0, (LPARAM)"Failed to get shared data!!!");
-		dbg("Hook failed to get shared mems");
+	//	dbg("Hook failed to get shared mems");
 		return FALSE;
 	}
 	//SendMessage(gOwShared.hwLog, LB_ADDSTRING, 0, (LPARAM)"Setting hook....");
 	ghMsgHook = SetWindowsHookEx(WH_CBT, CBTProc, ghInst, 0);
 	if(ghMsgHook != NULL)
 	{
-		dbg("Hooked okay");
+		//dbg("Hooked okay");
 		//SendMessage(gOwShared.hwLog, LB_ADDSTRING, 0, (LPARAM)"Hooked ok!");
 		return 1;
 	}
-	dbg("Hook failed");
+	//dbg("Hook failed");
 	//SendMessage(gOwShared.hwLog, LB_ADDSTRING, 0, (LPARAM)"Failed hook");
 	return 0;
 }
 
 
-int __declspec(dllexport) rmvHook(void)
+int DLLEXPORT rmvHook(void)
 {
 	if( !ghMsgHook )
 		return 1;
@@ -689,13 +678,13 @@ int __declspec(dllexport) rmvHook(void)
 		UnhookWindowsHookEx(ghSysMsgHook);
 		ghSysMsgHook = NULL;
 	}
-	dbg("DLL: Removing hook");
+	//dbg("DLL: Removing hook");
 	if( ghMsgHook )
 	{
 		UnhookWindowsHookEx(ghMsgHook);
 		ghMsgHook = NULL;
 	}
-	dbg("DLL: removed hook okay");
+	//dbg("DLL: removed hook okay");
 	return 1;
 }
 
@@ -756,3 +745,20 @@ static LRESULT CALLBACK SysMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
     return CallNextHookEx(ghSysMsgHook, nCode, wParam, lParam);
 }
 */
+
+BOOL DLLEXPORT WINAPI DLLPROC(HINSTANCE hDLLInst, DWORD fdwReason, LPVOID lpvReserved)
+{
+    switch (fdwReason)
+    {
+        case DLL_PROCESS_ATTACH:
+			ghInst = hDLLInst;
+            break;
+        case DLL_PROCESS_DETACH:
+			ghInst = NULL;
+	        break;
+		default:
+            break;
+    }
+    return TRUE;
+}
+
