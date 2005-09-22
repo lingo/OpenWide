@@ -362,6 +362,20 @@ LRESULT CALLBACK WINAPI wpSubMain(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 						{
 							//dbg("hwLV is in report mode -- setting extended style");
 							ListView_SetExtendedListViewStyleEx(hwLV, OW_LISTVIEW_STYLE, OW_LISTVIEW_STYLE );
+							INPUT in[4] = {0};
+							in[0].type = INPUT_KEYBOARD;
+							in[0].ki.wVk = VK_CONTROL;
+							in[1].type = INPUT_KEYBOARD;
+							in[1].ki.wVk = VK_ADD;
+							in[2].type = INPUT_KEYBOARD;
+							in[2].ki.wVk = VK_CONTROL;
+							in[2].ki.dwFlags = KEYEVENTF_KEYUP;
+							in[3].type = INPUT_KEYBOARD;
+							in[3].ki.wVk = VK_ADD;
+							in[3].ki.dwFlags = KEYEVENTF_KEYUP;
+							HWND hwOld = SetFocus(hwLV);
+							SendInput(4, in, sizeof(INPUT));
+							SetFocus(hwOld);
 						}
 					}
 					SetTimer(hwnd, 251177, 1, NULL);
@@ -524,6 +538,42 @@ static BOOL isExcluded(const char *szApp)
 }
 
 
+static void	dbgCreateParams(LPVOID lpCreateParams)
+{
+	UNALIGNED short * pcbData = (UNALIGNED short *)lpCreateParams;
+	if( pcbData )
+	{
+		short cbData = * pcbData;
+		UNALIGNED byte *pbData = (UNALIGNED byte *)pcbData;
+		pbData += sizeof(short);
+		dbg("**CreateParams:");
+		dbg("  %d bytes of data, starting at x%p", cbData, pbData);
+		if( pbData )
+		{
+			dbg("  First 8 bytes follow:");
+			int len = min( cbData, 8 );
+			char 	s[32] = {0};
+			int i;
+			for(i=0; i < len; i++)
+			{
+				s[i] = pbData[i];
+			}
+			s[i] = 0;
+			dbg("  \"%s\" (hex follows)", s);
+			char st[8];
+			s[0] = 0;
+			for(i=0; i < len; i++)
+			{
+				sprintf(st, "%02x ", pbData[i]);
+				strcat(s, st);
+			}
+			dbg("  %s", s);
+		}
+	}
+	else
+		dbg("CreateParams is NULL (%p)", pcbData);
+}
+
 static LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
 
@@ -567,6 +617,7 @@ static LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam)
 
 					if( bTakeOver && openSharedMem() )
 					{
+						//dbgCreateParams(pcs->lpCreateParams);
 						//dbg("DLL: Opened shared memory");
 						if( gpSharedMem->bDisable )
 							bTakeOver = FALSE;

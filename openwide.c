@@ -312,6 +312,7 @@ void	doQuit(void)
 
 LRESULT WINAPI CALLBACK wpListener(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
+	static UINT uTaskbarMsg=0;
 	switch(msg)
 	{
 		case WM_CREATE:
@@ -320,6 +321,7 @@ LRESULT WINAPI CALLBACK wpListener(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 				Warn("OpenWide failed to initialize properly.  Please report this bug:\r\nErr msg: %s", geterrmsg());
 				return -1;
 			}
+			uTaskbarMsg = RegisterWindowMessage("TaskbarCreated");
 			break;
 		case WM_COMMAND:
 			switch(LOWORD(wp))
@@ -368,6 +370,15 @@ LRESULT WINAPI CALLBACK wpListener(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 						PostQuitMessage(0);
 					releaseMutex();
 				}
+			}
+			else if( msg == uTaskbarMsg )	// taskbar re-created, re-add icon if option is enabled.
+			{
+				if( !waitForMutex() )
+					return 0;
+				BOOL bIcon		= gPowData->bShowIcon;
+				releaseMutex();
+
+				if(bIcon)	addTrayIcon(hwnd);
 			}
 			return DefWindowProc(hwnd, msg, wp, lp);
 	}

@@ -40,7 +40,7 @@ SectionEnd
 Section -AdditionalIcons
   WriteIniStr "$INSTDIR\${PRODUCT_NAME}.url" "InternetShortcut" "URL" "${PRODUCT_WEB_SITE}"
   CreateShortCut "$SMPROGRAMS\OpenWide\Website.lnk" "$INSTDIR\${PRODUCT_NAME}.url"
-  CreateShortCut "$SMPROGRAMS\OpenWide\Uninstall.lnk" "$INSTDIR\uninst.exe" "" "${NSISDIR}\Contrib\Graphics\Icons\arrow2-uninstall.ico"
+  CreateShortCut "$SMPROGRAMS\OpenWide\Uninstall.lnk" "$INSTDIR\uninst.exe" "" "$INSTDIR\uninst.exe" 0
 SectionEnd
 
 Section -Post
@@ -69,8 +69,8 @@ Section Uninstall
   Delete "$INSTDIR\${PRODUCT_NAME}.url"
   Delete "$INSTDIR\uninst.exe"
   Delete "$INSTDIR\readme.txt"
-  Delete "$INSTDIR\openwidedll.dll"
-  Delete "$INSTDIR\openwide.exe"
+  Delete /REBOOTOK "$INSTDIR\openwidedll.dll"
+  Delete /REBOOTOK "$INSTDIR\openwide.exe"
 
   Delete "$SMPROGRAMS\OpenWide\Uninstall.lnk"
   Delete "$SMPROGRAMS\OpenWide\Website.lnk"
