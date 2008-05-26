@@ -46,7 +46,7 @@ extern HANDLE		ghMutex;
 extern OWSharedData	gOwShared;
 
 
-/* Copied on : Tue Jul 12 04:13:13 2005 */
+
 void closeSharedMem(void);
 BOOL DLLEXPORT WINAPI DLLPROC(HINSTANCE hDLLInst, DWORD fdwReason, LPVOID lpvReserved);
 int getSharedData(void);
@@ -57,7 +57,7 @@ void releaseSharedMem(void);
 void CALLBACK timerProc(HWND hwnd, UINT uMsg, UINT uID, DWORD dwTime);
 
 
-/* Copied on : Wed Jul 13 22:15:28 2005 */
+
 HWND findChildWindow(HWND hwParent, UINT uID, const char *szClass);
 int focusDlgItem(HWND hwnd, int iFocus);
 WORD focusToCtlID(int iFocus);

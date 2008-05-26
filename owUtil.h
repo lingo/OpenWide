@@ -24,7 +24,7 @@ extern HANDLE			ghMutex;
 extern HICON			ghIconLG, ghIconSm;
 
 
-/* Copied on : Tue Jul 12 19:04:19 2005 */
+
 int Add_TrayIcon(HICON hIcon, char *szTip, HWND hwnd, UINT uMsg, DWORD dwState);
 static int AddRem_TrayIcon(HICON hIcon, char *szTip, HWND hwnd, UINT uMsg, DWORD dwState, DWORD dwMode);
 int  cbAddString(HWND hwCB, const char *szStr, LPARAM lpData);

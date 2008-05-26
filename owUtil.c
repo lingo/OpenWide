@@ -57,8 +57,8 @@ UINT APIENTRY OFNHookProcOldStyle(
 }
 
 
-/* Copied by pro2 : (c)2004 Luke Hudson */
-/** Function source : C:\Data\Code\C\resh\resh.c */
+
+
 char *Prompt_File_Name(int iFlags, HWND hwOwner, const char *pszFilter, const char *pszTitle)
 {
 	static char szFileName[MAX_PATH];			// store selected file
@@ -115,8 +115,8 @@ char *Prompt_File_Name(int iFlags, HWND hwOwner, const char *pszFilter, const ch
 }
 
 
-/* Copied on : Tue Jul 12 18:03:16 2005 */
-/** Function source : C:\Data\Code\C\resh\listview.c */
+
+
 TCHAR *lbGetItemText(HWND hwLB, int iItem)
 {
 	TCHAR *szText = NULL;
@@ -132,7 +132,7 @@ TCHAR *lbGetItemText(HWND hwLB, int iItem)
 	return szText;
 }
 
-/** Function source : C:\Data\Code\C\ExtassE\util.c */
+
 static int AddRem_TrayIcon(HICON hIcon, char *szTip, HWND hwnd, UINT uMsg, DWORD dwState, DWORD dwMode){
 
 	NOTIFYICONDATA nid;
@@ -154,13 +154,13 @@ static int AddRem_TrayIcon(HICON hIcon, char *szTip, HWND hwnd, UINT uMsg, DWORD
 	return (Shell_NotifyIcon(dwMode, &nid) != 0);
 }
 
-/* Copied by pro2 : (c)2004 Luke Hudson */
-/** Function source : C:\Data\Code\C\ExtassE\util.c */
+
+
 int Add_TrayIcon(HICON hIcon, char *szTip, HWND hwnd, UINT uMsg, DWORD dwState){
 	return AddRem_TrayIcon(hIcon, szTip, hwnd, uMsg, dwState, NIM_ADD);
 }
 
-/** Function source : C:\Data\Code\C\ExtassE\util.c */
+
 void EndTrayOperation(void)
 {
 	NOTIFYICONDATA nid = {0};
@@ -168,7 +168,7 @@ void EndTrayOperation(void)
 	Shell_NotifyIcon(NIM_SETFOCUS, &nid);
 }
 
-/** Function source : C:\Data\Code\C\ExtassE\util.c */
+
 int Rem_TrayIcon(HWND hwnd, UINT uMsg, DWORD dwState){
 	return AddRem_TrayIcon(NULL, NULL, hwnd, uMsg, dwState, NIM_DELETE);
 }
@@ -186,8 +186,8 @@ BOOL	delFile(HWND hwnd, const char *szFile)
 
 
 
-/* Copied by pro2 : (c)2004 Luke Hudson */
-/** Function source : C:\Data\Code\C\Proto\util.c */
+
+
 BOOL fileExists (const char *path)
 {
 	int errCode;
@@ -280,8 +280,8 @@ int	getDlgItemRect(HWND hwnd, UINT uID, LPRECT pr)
 	return 1;
 }
 
-/* Copied on : Tue Jul 12 02:29:56 2005 */
-/** Function source : C:\Data\Code\C\openwide\psDlg.c */
+
+
 BOOL	waitForMutex(void)
 {
 	DWORD dwRes;
