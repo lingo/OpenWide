@@ -33,7 +33,7 @@
 
 typedef int (*RegValEnumProc)(HKEY hk, const TCHAR *keyName, DWORD dwType, LPVOID pparam);
 
-/* Copied on : Wed Jul 13 23:04:03 2005 */
+
 void dbg(char *szError, ...);
 char * getDlgItemText(HWND hwnd, UINT uID);
 DWORD GetDllVersion(LPCTSTR lpszDllName);

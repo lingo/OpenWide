@@ -187,7 +187,7 @@ int regEnumValues(HKEY hkRoot, RegValEnumProc fp, LPVOID param)
 	return 1;
 }
 
-/** Function source : C:\Data\Code\C\openwide\owUtil.c */
+
 DWORD regGetDWORD(HKEY hkRoot, const char *szValue, int *pSuccess){
 	DWORD dwType, dwSize = 0;
 	LONG res;
@@ -207,7 +207,7 @@ DWORD regGetDWORD(HKEY hkRoot, const char *szValue, int *pSuccess){
 	return dword;
 }
 
-/** Function source : C:\Data\Code\C\openwide\owUtil.c */
+
 int regGetMaxValueNameLength(HKEY hk, LPDWORD pValueDataLen)
 {
 	DWORD dwNLen, dwDLen;
@@ -223,7 +223,7 @@ int regGetMaxValueNameLength(HKEY hk, LPDWORD pValueDataLen)
 	return 0;
 }
 
-/** Function source : C:\Data\Code\C\openwide\owUtil.c */
+
 HKEY regOpenKey(HKEY hkParent, const char *szSubKey){
 	LONG res;
 	HKEY hk;
@@ -233,7 +233,7 @@ HKEY regOpenKey(HKEY hkParent, const char *szSubKey){
 	return ( res == ERROR_SUCCESS ) ? hk : NULL;
 }
 
-/** Function source : C:\Data\Code\C\openwide\owUtil.c */
+
 BYTE *regReadBinaryData(HKEY hkRoot, const char *szValueName){
 	DWORD dwType, dwSize = 0;
 	LONG res;
@@ -250,7 +250,7 @@ BYTE *regReadBinaryData(HKEY hkRoot, const char *szValueName){
 	return NULL;
 }
 
-/** Function source : C:\Data\Code\C\openwide\owUtil.c */
+
 DWORD regReadDWORD(HKEY hkRoot, const char *szValueName, int *pSuccess)
 {
 	LONG res;
@@ -269,7 +269,7 @@ DWORD regReadDWORD(HKEY hkRoot, const char *szValueName, int *pSuccess)
 	return dword;
 }
 
-/** Function source : C:\Data\Code\C\openwide\owUtil.c */
+
 char *regReadSZ(HKEY hk, const char *szValueName){
 	LONG res;
 	DWORD dwType, dwSize = 0L;
@@ -288,14 +288,14 @@ char *regReadSZ(HKEY hk, const char *szValueName){
 	return NULL;
 }
 
-/** Function source : C:\Data\Code\C\openwide\owUtil.c */
+
 int regWriteBinaryData(HKEY hkRoot, const char *szValue, BYTE *buf, int bufSize ){
 	LONG res;
 	res = RegSetValueEx(hkRoot, szValue, 0L, REG_BINARY, buf, bufSize);
 	return (res == ERROR_SUCCESS);
 }
 
-/** Function source : C:\Data\Code\C\openwide\owUtil.c */
+
 int regWriteDWORD(HKEY hkRoot, const char *szValue, DWORD dwData){
 	LONG res;
 	res = RegSetValueEx(hkRoot, (LPCTSTR)szValue, 0L, REG_DWORD,
@@ -304,7 +304,7 @@ int regWriteDWORD(HKEY hkRoot, const char *szValue, DWORD dwData){
 	return (res == ERROR_SUCCESS);
 }
 
-/** Function source : C:\Data\Code\C\openwide\owUtil.c */
+
 int regWriteSZ(HKEY hkRoot, const char *szValueName, const char *szData){
 	LONG res;
 	if(!szData)
@@ -316,8 +316,8 @@ int regWriteSZ(HKEY hkRoot, const char *szValueName, const char *szData){
 	return (res == ERROR_SUCCESS);
 }
 
-/* Copied on : Tue Jul 12 19:00:24 2005 */
-/** Function source : C:\Data\Code\C\openwide\owUtil.c */
+
+
 const char * geterrmsg(void)
 {
 	static char szMsg[256];
@@ -339,8 +339,8 @@ const char * geterrmsg(void)
 	return szMsg;
 }
 
-/* Copied on : Tue Jul 12 19:07:35 2005 */
-/** Function source : C:\Data\Code\C\openwide\owUtil.c */
+
+
 void Warn(char *szError, ...)
 {
 	char		szBuff[256];

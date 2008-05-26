@@ -32,8 +32,8 @@
 #include	"owDllInc.h"
 
 
-/* Copied on : Tue Jul 12 04:04:38 2005 */
-/** Function source : C:\Data\Code\C\openwide\openwidedll.c */
+
+
 int focusDlgItem(HWND hwnd, int iFocus)
 {
 	UINT uID = focusToCtlID(gOwShared.iFocus);
@@ -45,7 +45,7 @@ int focusDlgItem(HWND hwnd, int iFocus)
 		return SetFocus( GetDlgItem(hwnd, uID)) != NULL;
 }
 
-/** Function source : C:\Data\Code\C\openwide\openwidedll.c */
+
 WORD	focusToCtlID(int	iFocus)
 {
 	//BOOL bXP = isWinXP();
@@ -65,7 +65,7 @@ WORD	focusToCtlID(int	iFocus)
 	return CID_DIRLIST;
 }
 
-/** Function source : C:\Data\Code\C\openwide\openwidedll.c */
+
 HWND 	getChildWinFromPt(HWND hwnd)
 {
 	POINT pt;
@@ -93,7 +93,7 @@ HWND 	getChildWinFromPt(HWND hwnd)
 }
 
 
-/** Function source : C:\Data\Code\C\openwide\openwidedll.c */
+
 int	subclass(HWND hwnd, WNDPROC wpNew, LPARAM lpData)
 {
 	if( GetProp(hwnd, OW_PROP_NAME) != NULL )
@@ -112,7 +112,7 @@ int	subclass(HWND hwnd, WNDPROC wpNew, LPARAM lpData)
 	return 1;
 }
 
-/** Function source : C:\Data\Code\C\openwide\openwidedll.c */
+
 int	unsubclass(HWND hwnd)
 {
 	POWSubClassData pow = (POWSubClassData)GetProp(hwnd, OW_PROP_NAME);
@@ -126,7 +126,7 @@ int	unsubclass(HWND hwnd)
 	return 0;
 }
 
-/** Function source : C:\Data\Code\C\openwide\openwidedll.c */
+
 WORD	viewToCmdID(int	iView)
 {
 	BOOL bXP = isWinXP();
@@ -148,8 +148,8 @@ WORD	viewToCmdID(int	iView)
 	return CMD_2K_LIST;
 }
 
-/* Copied on : Tue Jul 12 02:29:56 2005 */
-/** Function source : C:\Data\Code\C\openwide\psDlg.c */
+
+
 BOOL	waitForMutex(void)
 {
 	DWORD dwRes;

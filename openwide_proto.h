@@ -25,7 +25,7 @@
 
 #include <windows.h>
 
-/* Copied on : Tue Jul 12 19:04:35 2005 */
+
 int  addTrayIcon(HWND hwnd);
 HWND createListenerWindow(void);
 int createWin(void);
@@ -44,7 +44,7 @@ int WINAPI WinMain(HINSTANCE hi, HINSTANCE hiPrv, LPSTR fakeCmdLine, int iShow);
 LRESULT WINAPI CALLBACK wpListener(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
 BOOL WINAPI CALLBACK wpPlacement(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
 
-/* Copied on : Tue Jul 12 19:05:40 2005 */
+
 void fillFocusCB(HWND hwnd, UINT uID);
 void fillViewCB(HWND hwnd, UINT uID);
 int initPrefs(HWND hwnd);

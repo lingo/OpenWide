@@ -55,8 +55,8 @@ int	savePrefsToRegistry(void)
 	return 0;
 }
 
-/* Copied on : Mon Jul 11 22:27:04 2005 */
-/** Function source : C:\Data\Code\C\openwide\openwide.c */
+
+
 int initPrefs(HWND hwnd)
 {
 	if(!initSharedMem(NULL))
@@ -532,8 +532,8 @@ static BOOL CALLBACK wpApps(HWND hwnd, UINT uMsg, WPARAM wp, LPARAM lp)
 
 
 
-/* Copied on : Tue Jul 05 19:21:25 2005 */
-/** Function source : C:\Data\Code\C\Proto\prefsdlg.c */
+
+
 static void fillSheet(PROPSHEETPAGE * psp, int idDlg, DLGPROC pfnDlgProc)
 {
 	memset(psp, 0, sizeof(PROPSHEETPAGE));
@@ -547,8 +547,8 @@ static void fillSheet(PROPSHEETPAGE * psp, int idDlg, DLGPROC pfnDlgProc)
 }
 
 
-/* Copied on : Tue Jul 05 19:21:08 2005 */
-/** Function source : C:\Data\Code\C\Proto\prefsdlg.c */
+
+
 int CALLBACK WINAPI initPropSheets(HWND hwnd, UINT msg, LPARAM lp)
 {
 	//dbg("initPropSheets: %p, %d", hwnd, msg);
