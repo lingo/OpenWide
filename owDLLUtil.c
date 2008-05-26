@@ -1,4 +1,9 @@
 #include <windows.h>
+/**
+ * @author  Luke Hudson
+ * @licence GPL2
+ */
+
 #include <commctrl.h>
 #include	<shlwapi.h>
 #include	<shellapi.h>

@@ -1,4 +1,9 @@
 /* --- The following code comes from c:\lcc\lib\wizard\dll.tpl. */
+/**
+ * @author  Luke Hudson
+ * @licence GPL2
+ */
+
 #include <windows.h>
 #include <commctrl.h>
 #include	<shlwapi.h>

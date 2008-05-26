@@ -1,4 +1,9 @@
 #ifndef LINGO_OPENWIDE_H
+/**
+ * @author  Luke Hudson
+ * @licence GPL2
+ */
+
 #define LINGO_OPENWIDE_H
 
 #include <windows.h>

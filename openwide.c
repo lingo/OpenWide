@@ -1,4 +1,9 @@
 #include	<windows.h>
+/**
+ * @author  Luke Hudson
+ * @licence GPL2
+ */
+
 #include	<objbase.h>
 #include	<shobjidl.h>
 #include	<shlguid.h>

@@ -1,4 +1,9 @@
 #ifndef	OW_UTIL_H
+/**
+ * @author  Luke Hudson
+ * @licence GPL2
+ */
+
 #define	OW_UTIL_H
 
 #include	<windows.h>

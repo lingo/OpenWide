@@ -1,4 +1,9 @@
 /* Weditres generated include file. Do NOT edit */
+/**
+ * @author  Luke Hudson
+ * @licence GPL2
+ */
+
 #define	IDD_MAIN	1001
 #define	IDD_PLACEMENT	1002
 #define	IDL_LOG	4001

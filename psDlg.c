@@ -1,4 +1,14 @@
 #include	<windows.h>
+/**
+/**
+ * @author  Luke Hudson
+ * @licence GPL2
+ */
+
+ * @author  Luke Hudson
+ * @licence GPL2
+ */
+
 #include	<shlwapi.h>
 #include	"openwidedll.h"
 #include	"openwideres.h"

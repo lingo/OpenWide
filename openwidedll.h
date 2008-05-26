@@ -1,4 +1,9 @@
 #ifndef	C__Data_Code_C_openwide_openwidedll_proto_h_H
+/**
+ * @author  Luke Hudson
+ * @licence GPL2
+ */
+
 #define	C__Data_Code_C_openwide_openwidedll_proto_h_H
 #pragma once
 
