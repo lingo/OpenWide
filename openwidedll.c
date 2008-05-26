@@ -20,7 +20,6 @@
  */
 
 
-/* --- The following code comes from c:\lcc\lib\wizard\dll.tpl. */
 #include <windows.h>
 #include <commctrl.h>
 #include	<shlwapi.h>
@@ -77,8 +76,7 @@ int addIcon2TB(HWND hwTB, HICON hIcn)
 			return idxNew;
 		}
 	}
-	else
-		return -1;
+    return -1;
 }
 
 /*
