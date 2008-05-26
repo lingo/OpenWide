@@ -1,4 +1,6 @@
-OpenWide 1.3b by Luke Hudson
+OpenWide
+Author: Luke Hudson
+
 
 About
 ~~~~~
@@ -13,10 +15,6 @@ If you find this program useful you may like to drop a line saying so to:
 
 	lukeletters@gmail.com
 
-This  is  a  test release.  Limited testing has shown it to work on a release of
-Win2000 Professional and a release of WinXP Home.
-
-
 Features
 ~~~~~~~~~
 - Set position and size of Open & Save dialogs
@@ -25,17 +23,10 @@ Features
 - Drag & drop folders onto the title bar of an Open/Save dialog box,
   and the view will change to that folder!
 
-
-
 License
 ~~~~~~~~
 
-This software can be freely used in all non-commercial ventures.
-The  software  may  be  redistributed  freely,  so long as this file accompanies
-distributions.
-
-The  software  is  (c)2005  Luke  Hudson.  No  other person or company may claim
-authorship of this software.
+See LICENSE.txt for information on the GPL2 licence.
 
 Warranty
 ~~~~~~~~
