@@ -1,3 +1,25 @@
+/*
+ * Openwide -- control Windows common dialog
+ * 
+ * Copyright (c) 2000 Luke Hudson
+ * 
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * 
+ */
+
+
 #include	<windows.h>
 #include	<objbase.h>
 #include	<shobjidl.h>
@@ -13,22 +35,44 @@
 #include	"openwide_proto.h"
 
 
+// Command identifiers for the trayicon popup menu.
 enum	TrayCommands	{	IDM_ABOUT = 100, IDM_SETTINGS, IDM_QUIT };
 
+// Window handles for the various windows
 HWND		ghwMain 	= NULL, ghwPropSheet	= NULL;
-HINSTANCE	ghInstance	= NULL;
-//HWND		ghwListBox	= NULL;
 
+// Global instance handle
+HINSTANCE	ghInstance	= NULL;
+
+// Icon handles; these icons are used in a few places
 HICON		ghIconLG		= NULL,	ghIconSm	= NULL;
 
+// This is a pointer shared data structure, containing all the useful info
 POWSharedData 	gPowData	= NULL;
+
+// Handle to our shared memory area -- access to this is controlled by a mutex
 HANDLE			ghSharedMem = NULL;
+
+// Mutex handle -- used to limit access to the shared memory area.
 HANDLE			ghMutex 	= NULL;
+
+// Message id, from RegisterWindowMessage(...), which is used to notify closure of : TODO: find out!
 UINT			giCloseMessage	= 0;
 
+
+
+/*
+ * Initialise the shared memory area 
+ *
+ * initShareMem( mainWindowHandle );
+ *
+ * @returns 1 on success, 0 on failure
+ */
 int initSharedMem(HWND hwnd)
 {
-	int rVal = 0;
+	int rVal = 0;	// return value
+
+	// Create the mutex
 	ghMutex = CreateMutex(NULL, TRUE, OW_MUTEX_NAME);
 	if( !ghMutex )
 		return 0;
@@ -38,7 +82,9 @@ int initSharedMem(HWND hwnd)
 		ghMutex = NULL;
 		return 0;
 	}*/
-	POWSharedData	pRData = NULL;
+
+	POWSharedData	pRData = NULL;	// Pointer to registry data
+
 	// try to read in saved settings from registry
 	HKEY	hk = regCreateKey(HKEY_CURRENT_USER,  OW_REGKEY_NAME);
 	if( hk )
@@ -52,53 +98,62 @@ int initSharedMem(HWND hwnd)
 
 	// Create a file mapping object against the system virtual memory.
 	// This will be used to share data between the application and instances of the dll.
-	ghSharedMem = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(OWSharedData), OW_SHARED_FILE_MAPPING);
+	ghSharedMem = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, 
+		sizeof(OWSharedData), OW_SHARED_FILE_MAPPING);
 	if(ghSharedMem)
 	{
-		// map a view of the file
+		// map a view of the 'file'
 		gPowData = (POWSharedData)MapViewOfFile(ghSharedMem, FILE_MAP_WRITE, 0,0,0);
 		if( gPowData )
 		{
 			// clear the shared mem
 			ZeroMemory(gPowData, sizeof(OWSharedData));
-			// if we succeeded in loading saved data, copy it back
+			// If we succeeded in loading saved data from the registry, 
+			// then copy it to the shared memory area
 			if( pRData )
 				CopyMemory(gPowData, pRData, sizeof(OWSharedData));
 			else
-			{
-				// initialise the memory to useful values.
+			{	// Nothing loaded from registry, so
+				// initialise the memory to some useful default values.
+
+				// Get screen dimensions
 				int w,h;
 				w = GetSystemMetrics(SM_CXSCREEN);
 				h = GetSystemMetrics(SM_CYSCREEN);
+
+				// Set the Open/Save dialog origin and width from the screen dimensions
 				gPowData->ptOrg.x = w/2 - w/4;
 				gPowData->ptOrg.y = (h - 2*h/3)/2;
-				gPowData->szDim.cx = w/2;
-				gPowData->szDim.cy = 2*h/3;
-				gPowData->iView = V_DETAILS;
-				gPowData->iFocus = F_DIRLIST;
-				gPowData->bShowIcon = 1;
+				gPowData->szDim.cx = w/2;	// Screen width / 2
+				gPowData->szDim.cy = 2*h/3;	// 2/3 of screen height
+				gPowData->iView = V_DETAILS;	// Use details view
+				gPowData->iFocus = F_DIRLIST;	// Focus directory listing
+				gPowData->bShowIcon = 1;	// Show the tray icon
 			}
-			gPowData->hwListener = hwnd;
-			gPowData->bDisable = 0;
-			gPowData->refCount = 0;
-			giCloseMessage = gPowData->iCloseMsg = RegisterWindowMessage("Lingo.OpenWide.ProcessFinished.Message");
-			rVal = 1;
-		}
-	}
+			gPowData->hwListener = hwnd;	// Listener window for trayicon events, etc.
+			gPowData->bDisable = 0;		// Enable the hook!
+			gPowData->refCount = 0;		// reference counting TODO: add explanation
+			giCloseMessage	= gPowData->iCloseMsg 
+					= RegisterWindowMessage("Lingo.OpenWide.ProcessFinished.Message");
+			rVal = 1;	// Return value to indicate success
+		} // if( gPowData )
+	} // if( ghSharedMem )
 
-	if( pRData )
+	if( pRData ) // free registry data
 		free(pRData);
 
-	releaseMutex();
+	releaseMutex(); // unlock Mutex, so shared memory area can be accessed.
 	return rVal;
-}
+} // END of initSharedMem(...)
 
 
 
+/*
+ * Free the shared memory area, once it is no longer in use.
+ */
 void releaseSharedMem(void)
 {
-//	dbg("DLL: Waiting for mutex");
-	if( ghMutex )
+	if( ghMutex ) // Obtain a lock on the shared memory access mutex
 	{
 		DWORD dwRes = WaitForSingleObject(ghMutex, INFINITE);
 		if(dwRes != WAIT_OBJECT_0)
@@ -111,7 +166,7 @@ void releaseSharedMem(void)
 //	dbg("DLL: Releasing file mapping");
 	if( ghSharedMem )
 	{
-		if( gPowData );
+		if( gPowData )
 		{
 			UnmapViewOfFile(gPowData);
 			gPowData = NULL;
@@ -120,7 +175,8 @@ void releaseSharedMem(void)
 		ghSharedMem = NULL;
 	}
 	ReleaseMutex(ghMutex);
-}
+} // END of releaseSharedMem()
+
 /*
 int	doApply(HWND hwnd)
 {
@@ -184,48 +240,72 @@ int	doApply(HWND hwnd)
 }
 */
 
-
+/* 
+ * Determines if this application has a shortcut in the 'Start Menu->Startup' directory.
+ */
 BOOL	isStartupApp(HWND hwnd)
 {
-	static char szBuf[MAX_PATH+1];
+	static char szBuf[MAX_PATH+1];	// path buffer
+
+	// Retrieve path to windows Startup folder
 	HRESULT hRes = SHGetFolderPath(hwnd, CSIDL_STARTUP, NULL, SHGFP_TYPE_CURRENT, szBuf);
 	if( hRes == S_OK )
 	{
-		PathAppend(szBuf, "OpenWide.lnk");
-		return fileExists(szBuf);
+		PathAppend(szBuf, "OpenWide.lnk");	// Append the name of the link :: TODO - this should be cleverer, perhaps.
+		return fileExists(szBuf);		// Check the shortcut exists :: TODO: Check if it points to the right place, too?
 	}
 	return FALSE;
 }
 
+/*
+ * Makes this program start with Windows, by creating a shortcut in the Windows Startup folder
+ *
+ *	setStartupApp( parentWindowOfErrors, isStartupApp )
+ *
+ *	@param isStartupApp -- set to 1 to create the shortcut, 0 to remove it.
+ *	@returns 1 on success, 0 on failure
+ */
 int		setStartupApp(HWND hwnd, BOOL	bSet)
 {
-	char szBuf[MAX_PATH+1], szModule[MAX_PATH+1];
+	char szBuf[MAX_PATH+1], szModule[MAX_PATH+1];	// some path buffers
 
+	// Empty the string buffers
 	ZeroMemory(szBuf, sizeof(szBuf)/sizeof(char));
 	ZeroMemory(szModule, sizeof(szBuf)/sizeof(char));
 
+	// Retrieve the path to this executable
 	if( !GetModuleFileName(NULL, szModule, MAX_PATH) )
 		return 0;
+
+	// Get the windows startup folder
 	HRESULT hRes = SHGetFolderPath(hwnd, CSIDL_STARTUP, NULL, SHGFP_TYPE_CURRENT, szBuf);
-	if( hRes != S_OK || !PathAppend(szBuf, "OpenWide.lnk"))
+	if( hRes != S_OK || !PathAppend(szBuf, "OpenWide.lnk"))	// Append link path to startup folder path as side-effect
 		return 0;
-	if( bSet )
+	if( bSet )	// Create the shortcut?
 	{	
 		if( fileExists(szBuf) )
-			hRes = delFile(hwnd, szBuf);
-		hRes = CreateLink(szModule, szBuf, "OpenWide - control Open&Save dialogs...");
+			hRes = delFile(hwnd, szBuf); // Delete existing if found
+		hRes = CreateLink(szModule, szBuf, "OpenWide - control Open&Save dialogs..."); // Create new shortcut
 		return hRes == S_OK;
 	}
-	else
+	else		// Delete the shortcut
 	{
 		return delFile(hwnd, szBuf);
 	}
-}
+} // END of setStartupApp(...)
 
+
+/*
+ * Create an event-listener window, which will be used for communication between the 
+ * app and DLL instances ???  TODO:: Check this!!
+ *
+ * NOTE: Looks like this is badly named, doesn't really do SFA with the listener win!!!  @see createListenerWindow()
+ * @param hwnd -- parent window?
+ */
 int initListener(HWND hwnd)
 {
 	if(!initSharedMem(hwnd))
-		return 0;
+		return 0;		// Make sure the shared memory area is set up.
 
 	BOOL bMinimize = FALSE, bIcon = TRUE;
 
@@ -233,7 +313,7 @@ int initListener(HWND hwnd)
 	if( !waitForMutex() )
 			return 0;
 
-	bMinimize	= gPowData->bStartMin;
+	bMinimize	= gPowData->bStartMin;	// get the preferences from the shared memory
 	bIcon		= gPowData->bShowIcon;
 
 /// released shared data
@@ -242,24 +322,33 @@ int initListener(HWND hwnd)
 	if(bIcon)
 		addTrayIcon(hwnd);
 
+	// Show property sheet only if the preferences specify it.
 	if( bMinimize )
 		ghwPropSheet = NULL;
 	else
 		ghwPropSheet = showDlg(hwnd);
 
+	// Create the main event hook
 	if( !setHook() )
 	{
 		Warn( "Failed to set hook: %s", geterrmsg() );
 		return 0;
 	}
 	return 1;
-}
+} // END of initListener(...)
 
+
+/*
+ * Create, and show the popup menu for the trayicon
+ *
+ * @param hwnd	-- window to receive WM_COMMAND messages.
+ */
 void	doTrayMenu(HWND hwnd)
 {
-	if( ghwPropSheet )
+	if( ghwPropSheet )	// Show the property sheet window
 		SetForegroundWindow(ghwPropSheet);
 
+	// Create the popup menu structure
 	HMENU	hm = CreatePopupMenu();
 	AppendMenu(hm, MF_STRING, IDM_ABOUT, "&About OpenWide...");
 	AppendMenu(hm, MF_GRAYED | MF_SEPARATOR, 0, NULL);
@@ -269,26 +358,43 @@ void	doTrayMenu(HWND hwnd)
 	SetMenuDefaultItem(hm, IDM_SETTINGS, FALSE);
 
 	POINT pt;
-	GetCursorPos(&pt);
+	GetCursorPos(&pt);	// Find mouse location
+
+	// Popup the menu
 	TrackPopupMenu(hm, TPM_RIGHTBUTTON | TPM_BOTTOMALIGN | TPM_RIGHTALIGN,
 		pt.x, pt.y, 0, hwnd, NULL);
-	DestroyMenu(hm);
-}
 
+	// Delete the menu structure again.
+	DestroyMenu(hm);
+} // END of doTrayMenu(...)
+
+/**
+ * Display the main property sheet dialog
+ *
+ *	@param hwnd -- parent window
+ */
 void	showSettingsDlg(HWND hwnd)
 {
-	if( ghwPropSheet )
+	if( ghwPropSheet )	// un-hide it if it exists already.
 	{
 		ShowWindow(ghwPropSheet, SW_SHOWNORMAL);
 		SetForegroundWindow(ghwPropSheet);
 	}
-	else
+	else 			// create and show the dialog if it doesn't already exist
 		ghwPropSheet = showDlg(hwnd);
-}
+} // END of showSettingsDlg(...)
 
+
+/*
+ * Quit the application, running cleanup tasks first.
+ *
+ * This is a high-level function which makes up part of the 'public' API of the program, 
+ * at least, as far as it has such an clear designed concept :(
+ *
+ * TODO:  Make sure the above statement is actually correct, and sort the functions into these sorts of categories somewhere.
+ */
 void	doQuit(void)
-{
-	if( ghwPropSheet )
+	if( ghwPropSheet )	// don't quit with the settings dialog open
 	{
 		SetForegroundWindow(ghwPropSheet);
 		Warn("Please close the settings dialog box before trying to quit");
@@ -297,19 +403,21 @@ void	doQuit(void)
 	//rmvHook();
 	if( waitForMutex() )
 	{
-//		dbg("Setting bDisable");
-		gPowData->bDisable = TRUE;
-//		dbg("refCount is %d", gPowData->refCount);
-		if(gPowData->refCount == 0)
+		gPowData->bDisable = TRUE;	// Tell hook not to subclass any more windows
+
+		if(gPowData->refCount == 0)	// if there are no more subclassed windows
 		{
-//			dbg("Posting quit message");
-			PostQuitMessage(0);
+			PostQuitMessage(0);	// quit program
 		}
 		releaseMutex();
 	}
 	remTrayIcon(ghwMain);
 }
 
+
+/*
+ * Listener window callback
+ */
 LRESULT WINAPI CALLBACK wpListener(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
 	static UINT uTaskbarMsg=0;
@@ -321,8 +429,10 @@ LRESULT WINAPI CALLBACK wpListener(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 				Warn("OpenWide failed to initialize properly.  Please report this bug:\r\nErr msg: %s", geterrmsg());
 				return -1;
 			}
-			uTaskbarMsg = RegisterWindowMessage("TaskbarCreated");
+			uTaskbarMsg = RegisterWindowMessage("TaskbarCreated");		// TODO:: WHAT IS THIS?
 			break;
+
+// Handle trayicon menu commands
 		case WM_COMMAND:
 			switch(LOWORD(wp))
 			{
@@ -337,6 +447,8 @@ LRESULT WINAPI CALLBACK wpListener(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 					break;
 			}
 			break;
+
+// Handle trayicon interaction events
 		case WM_TRAYICON:
 			switch(lp)
 			{
@@ -386,10 +498,14 @@ LRESULT WINAPI CALLBACK wpListener(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 }
 
 
+/*
+ * Callback for the placement window. This is the proxy window which can be 
+ * resized and moved to set the desired Open/Save dialog dimensions. 
+ */
 BOOL WINAPI CALLBACK wpPlacement(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
 	static LPRECT pr = NULL;
-	static BOOL bXP;
+	static BOOL bXP;	// Are we using WinXP ? -- Changes the minimum dialog dimensions.
 	switch(msg)
 	{
 		case WM_INITDIALOG:
@@ -399,6 +515,7 @@ BOOL WINAPI CALLBACK wpPlacement(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			bXP = isWinXP();
 			MoveWindow(hwnd, pr->left, pr->top, pr->right, pr->bottom, FALSE);
 			break;
+
 		case WM_COMMAND:
 			switch(LOWORD(wp))
 			{
@@ -411,6 +528,8 @@ BOOL WINAPI CALLBACK wpPlacement(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 					break;
 			}
 			break;
+
+// Used to limit the minimum dimensions while resizing
 		case WM_GETMINMAXINFO:
 			{
 				MINMAXINFO * pmm = (MINMAXINFO *)lp;
@@ -428,6 +547,7 @@ BOOL WINAPI CALLBACK wpPlacement(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 				}
 			}
 			break;
+
 		case WM_CLOSE:
 			EndDialog(hwnd, 0);
 			break;
@@ -437,16 +557,21 @@ BOOL WINAPI CALLBACK wpPlacement(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 	return 1;
 }
 
+
+/* Create our trayicon */
 int		addTrayIcon(HWND hwnd)
 {
 	return Add_TrayIcon( ghIconSm, "OpenWide\r\nRight-Click for menu...", hwnd, WM_TRAYICON, 0);
 }
 
+/* Remove the trayicon! */
 void	remTrayIcon(HWND hwnd)
 {
 	Rem_TrayIcon( hwnd, WM_TRAYICON, 0 );
 }
 
+
+/* Creates the listener window */
 HWND	createListenerWindow(void)
 {
 	static BOOL bRegd = FALSE;
@@ -466,17 +591,20 @@ HWND	createListenerWindow(void)
 		WS_POPUP, 0,0, 1,1, NULL, NULL, ghInstance, NULL);
 }
 
+// TODO: Remove this useless function!
 int createWin(void)
 {	
 	ghwMain = createListenerWindow();
 	return 1;
 }
 
+// TODO: why the new naming convention ?
 int ow_init(void)
 {
-	HRESULT hRes = CoInitialize(NULL);
+	HRESULT hRes = CoInitialize(NULL);	// Initialise COM -- for some reason I forget, we need to do this.
 	if( hRes != S_OK && hRes != S_FALSE )
 		return 0;
+	// Load the icons from the .exe resource section
 	ghIconSm = (HICON)LoadImage(ghInstance, MAKEINTRESOURCE(IDI_TRAY), IMAGE_ICON, 16,16, LR_SHARED | LR_VGACOLOR);
 	ghIconLG = (HICON)LoadIcon(ghInstance, MAKEINTRESOURCE(IDI_TRAY));
 	if( !createWin() )
@@ -498,16 +626,19 @@ void ow_shutdown(void)
 
 int WINAPI WinMain(HINSTANCE hi, HINSTANCE hiPrv, LPSTR fakeCmdLine, int iShow)
 {
+	// This Mutex is used to ensure that only one instance of this app can be running at a time. 
 	HANDLE	hMutex = NULL;
 	hMutex = CreateMutex(NULL, FALSE, "OpenWide_App_Mutex");
 	if( hMutex && GetLastError()==ERROR_ALREADY_EXISTS )
 	{
+		// This app is already loaded, so find its window and send it a message.
 		CloseHandle(hMutex);
 		HWND hw = FindWindowEx(NULL, NULL, "Lingo.OpenWide.Listener", "Lingo.OpenWide");
-		if(hw)
+		if(hw)	// Fake a double click on the trayicon -- to show the window.
 			SendMessage(hw, WM_TRAYICON, 0, WM_LBUTTONDBLCLK);
-		return 0;
+		return 0;	// Exit this instance of the app.
 	}
+
 	ghInstance = hi;
 	if( !ow_init() )
 	{

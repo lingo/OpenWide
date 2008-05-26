@@ -11,8 +11,7 @@ Good luck with it and enjoy.
 
 If you find this program useful you may like to drop a line saying so to:
 
-	careof@hotmail.com
-
+	lukeletters@gmail.com
 
 This  is  a  test release.  Limited testing has shown it to work on a release of
 Win2000 Professional and a release of WinXP Home.

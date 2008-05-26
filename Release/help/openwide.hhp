@@ -3,9 +3,16 @@
 ; of the original project file.
 
 [OPTIONS]
+Compatibility=1.1 or later
 Compiled file=openwide.chm
-Default topic=openwide.htm
 Default Window=Main
+Default topic=openwide.htm
+Display compile progress=No
+Language=0x409 English (United States)
+
+[WINDOWS]
+Main="OpenWide Help",,,"openwide.htm","openwide.htm",,,,,0x2000,,0x4c,[0,0,600,600],0x100f0000,,,1,,,0
+
 
 [FILES]
 images\odlg.gif
@@ -15,5 +22,5 @@ license.htm
 openwide.htm
 style.css
 
-[WINDOWS]
-Main="OpenWide Help",,,"openwide.htm","openwide.htm",,,,,0x2020,,0x4c,[0,0,600,600],0x100f0000,,,1,,0,
+[INFOTYPES]
+
