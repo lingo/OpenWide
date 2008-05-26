@@ -26,7 +26,7 @@ Features
 License
 ~~~~~~~~
 
-See gpl-2.0.txt for information on the GPL2 licence.
+See LICENSE.txt for information on the GPL2 licence.
 
 Warranty
 ~~~~~~~~

@@ -1,9 +1,26 @@
-#include	<windows.h>
-/**
- * @author  Luke Hudson
- * @licence GPL2
+/*
+ * Openwide -- control Windows common dialog
+ * 
+ * Copyright (c) 2000 Luke Hudson
+ * 
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * 
  */
 
+
+#include	<windows.h>
 #include	<objbase.h>
 #include	<shobjidl.h>
 #include	<shlguid.h>
@@ -15,8 +32,11 @@
 //#include	"openwideres.h"
 #include	"owSharedUtil.h"
 
-
-
+/*
+ * Printf-style logging using OutputDebugString.
+ * This is best monitored using the free DbgMon program from Sysinternals.
+ * @see www.sysinternals.com
+ */
 void dbg(char *szError, ...)
 {
 #ifdef DEBUG
@@ -29,8 +49,9 @@ void dbg(char *szError, ...)
 #endif
 }
 
-
-
+/*
+ * Get the text of control 'uID' from window 'hwnd'
+ */
 char * getDlgItemText(HWND hwnd, UINT uID)
 {
 	HWND hwCtl = GetDlgItem(hwnd, uID);
@@ -50,8 +71,7 @@ char * getDlgItemText(HWND hwnd, UINT uID)
 }
 
 
-
-
+/* From MS sample code */
 DWORD GetDllVersion(LPCTSTR lpszDllName)
 {
     HINSTANCE hinstDll;
@@ -96,6 +116,7 @@ DWORD GetDllVersion(LPCTSTR lpszDllName)
 }
 
 
+/* Determines if winXP is running -- TODO: This may need checking for newer versions ? */
 BOOL isWinXP(void)
 {
 	return GetDllVersion("Shell32.dll") >= PACKVERSION(6,00);
@@ -103,14 +124,15 @@ BOOL isWinXP(void)
 
 
 
-
-
+/* Wrapper around RegCloseKey, used for consistency with the other reg* functions */
 void regCloseKey(HKEY hk)
 {
 	RegCloseKey(hk);
 }
 
-
+/* Create the registry subkey 'szSubKey' under the key 'hkParent'.
+ * Note that hkParent can also be one of the HKEY_* constants, such as HKEY_CURRENT_USER
+ */
 HKEY regCreateKey(HKEY hkParent, const char *szSubKey){
 	LONG res;
 	HKEY hk;
@@ -119,7 +141,7 @@ HKEY regCreateKey(HKEY hkParent, const char *szSubKey){
 	return ( res == ERROR_SUCCESS ) ? hk : NULL;
 }
 
-
+/* Delete (recursively) the registry subkey 'szSubKey' under 'hkParent' */
 int regDeleteKey(HKEY hkParent, const char *szSubKey)
 {
 	DWORD rv;
@@ -127,7 +149,13 @@ int regDeleteKey(HKEY hkParent, const char *szSubKey)
 	return rv;
 }
 
-
+/* Enumerate the values store within the registry key hkRoot, calling
+ * the callback function fp once for each value.
+ * 
+ * The callback works as follows:
+ *
+ * TODO:: Fill this in !
+ */
 int regEnumValues(HKEY hkRoot, RegValEnumProc fp, LPVOID param)
 {
 	DWORD ccBuf = regGetMaxValueNameLength(hkRoot, NULL);
@@ -318,7 +346,7 @@ void Warn(char *szError, ...)
 	char		szBuff[256];
 	va_list		vl;
 	va_start(vl, szError);
-    _vsnprintf(szBuff, 256, szError, vl);	// print error message to string
+    vsnprintf(szBuff, 256, szError, vl);	// print error message to string
 	OutputDebugString(szBuff);
 	MessageBox(NULL, szBuff, "Error", MB_OK); // show message
 	va_end(vl);

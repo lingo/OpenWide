@@ -8,12 +8,12 @@ POC_PROJECT_TYPE = 1#
 POC_PROJECT_PATH = .#
 POC_PROJECT_ARGUMENTS = #
 POC_PROJECT_WORKPATH = #
-POC_PROJECT_EXECUTOR = #
+POC_PROJECT_EXECUTOR = C:\code\C\openwide\openwide.exe#
 CC = pocc.exe#
 AS = ml.exe#
 RC = porc.exe#
 LINK = polink.exe#
-CCFLAGS =  -Tx86-coff -MT -Os -W2 -Gz -Ze -D_WIN32_IE=0x0600 -D_WIN32_WINNT=0x0500 -DBUILDNO=1 -DDEBUG #
+CCFLAGS = -Tx86-coff -MT -Os -W2 -Gz -Ze -D_WIN32_IE=0x0600 -D_WIN32_WINNT=0x0500 -DBUILDNO=1 -DDEBUG #
 ASFLAGS = -W1 -Cu -c -nologo -coff#
 RCFLAGS = #
 LINKFLAGS = -subsystem:windows -machine:ix86 -dll kernel32.lib user32.lib gdi32.lib comctl32.lib comdlg32.lib advapi32.lib delayimp.lib shell32.lib shlwapi.lib#

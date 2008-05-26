@@ -1,3 +1,25 @@
+/*
+ * Openwide -- control Windows common dialog
+ * 
+ * Copyright (c) 2000 Luke Hudson
+ * 
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * 
+ */
+
+
 #include	<windows.h>
 /**
  * @author  Luke Hudson
@@ -16,6 +38,8 @@
 #include	"owutil.h"
 #include	"owSharedUtil.h"
 
+
+/* Attempt to convert from dialog units (measures used in .rc files) to pixels onscreen */
 int		dlgUnits2Pix(HWND hwnd, int units, BOOL bHorz)
 {
 	RECT r;
@@ -39,7 +63,7 @@ void Error(char *szError, ...)
 	char		szBuff[256];
 	va_list		vl;
 	va_start(vl, szError);
-    _vsnprintf(szBuff, 256, szError, vl);	// print error message to string
+    vsnprintf(szBuff, 256, szError, vl);	// print error message to string
 	OutputDebugString(szBuff);
 	MessageBox(NULL, szBuff, "Error", MB_OK); // show message
 	va_end(vl);

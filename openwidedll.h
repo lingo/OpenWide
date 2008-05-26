@@ -1,3 +1,25 @@
+/*
+ * Openwide -- control Windows common dialog
+ * 
+ * Copyright (c) 2000 Luke Hudson
+ * 
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * 
+ */
+
+
 #ifndef	C__Data_Code_C_openwide_openwidedll_proto_h_H
 /**
  * @author  Luke Hudson
@@ -11,6 +33,7 @@
 
 #define	DLLEXPORT __declspec(dllexport)
 
+// Different view and focus options for the Open/Save dialogs
 enum	ViewMode	{V_LGICONS, V_SMICONS, V_LIST, V_DETAILS, V_THUMBS, V_TILES, V_MAX};
 
 enum	FocusMode	{F_DIRLIST, F_FNAME, F_FTYPE, F_PLACES, F_LOOKIN, F_MAX};

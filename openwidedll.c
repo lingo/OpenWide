@@ -1,7 +1,22 @@
-/* --- The following code comes from c:\lcc\lib\wizard\dll.tpl. */
-/**
- * @author  Luke Hudson
- * @licence GPL2
+/*
+ * Openwide -- control Windows common dialog
+ * 
+ * Copyright (c) 2000 Luke Hudson
+ * 
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * 
  */
 
 #include <windows.h>
@@ -18,16 +33,28 @@
 #include	"owSharedUtil.h"
 
 
+// DLL Instance handle
 HINSTANCE		ghInst = NULL;
+
+// Handle to shared memory access locking mutex.
 HANDLE			ghMutex = NULL;
 POWSharedData	gpSharedMem = NULL;	// pointer to shared mem
+// Handle to filemapping for shared mem
 HANDLE			ghMap		= NULL;
+// System hook handles
 HHOOK			ghMsgHook	= NULL, ghSysMsgHook = NULL;
 
+// This cache is refreshed -- TODO: When?
 OWSharedData	gOwShared; // stores copy of shared mem for access to non-pointer datas without extended blocking
 
 
 
+/* Add an icon to the toolbar within the O&S Dialogs 
+ * @param hwTB  -- toolbar handle
+ * @param hIcn  -- icon handle
+ *
+ * @returns -1 on error, or the index of the new icon within the imagelist.
+ */
 int addIcon2TB(HWND hwTB, HICON hIcn)
 {
 	HIMAGELIST hImgList = NULL;
@@ -48,17 +75,26 @@ int addIcon2TB(HWND hwTB, HICON hIcn)
 			return idxNew;
 		}
 	}
-	else
-		return -1;
+    return -1;
 }
 
+/*
+ * Adds a new button to the toolbar : hwnd
+ *
+ * @param hwnd  -- parent window of toolbar, ie. the O&S Dialog.
+ *
+ * @returns 1 -- TODO: this should return 0 on error, but doesn't appear to.
+ */
 static int addTBButton(HWND hwnd)
 {
+    // Locate the toolbar handle.
 	HWND hwTB = findChildWindow(hwnd, CID_TOOLBAR, TOOLBARCLASSNAME);
 
+    // Create toolbar button structure
 	TBBUTTON tb = { 0 };
 	tb.iBitmap = VIEW_NETCONNECT;
 
+    // Load the toolbar icon, and add it to the imagelist, retaining the index.
 	int idxNew = -1;
 	HICON hIcn = (HICON)LoadImage(ghInst, MAKEINTRESOURCE(IDI_TBICON), IMAGE_ICON, 16, 16, 0);
 	if (hIcn)
@@ -67,13 +103,18 @@ static int addTBButton(HWND hwnd)
 		DestroyIcon(hIcn);
 	}
 	if (idxNew >= 0)
-		tb.iBitmap = idxNew;
-	tb.idCommand = OW_TBUTTON_CMDID;
+		tb.iBitmap = idxNew;    // set button image index
+	tb.idCommand = OW_TBUTTON_CMDID;    // set command id -- @see openwidedll.h
+    // Set the button style flags
 	tb.fsStyle = BTNS_AUTOSIZE | BTNS_BUTTON | BTNS_SHOWTEXT | BTNS_DROPDOWN;	// BTNS_WHOLEDROPDOWN;
+    // Set the button state flags
 	tb.fsState = TBSTATE_ENABLED;
+    // And give it a tooltip ? TODO: Check this
 	tb.iString = (INT_PTR)"OpenWide by Lingo";
+    // Add the button.
 	SendMessage(hwTB, TB_ADDBUTTONS, 1, (LPARAM) & tb);
 
+    // Ensure that the toolbar window is large enough to show the new button.
 	RECT r;
 	int idxLast = SendMessage(hwTB, TB_BUTTONCOUNT, 0, 0) - 1;
 	if (SendMessage(hwTB, TB_GETITEMRECT, idxLast, (LPARAM) & r))
@@ -84,23 +125,37 @@ static int addTBButton(HWND hwnd)
 		SetWindowPos(hwTB, NULL, 0, 0, (r.right + 8) - rw.left, rw.bottom - rw.top + 1, SWP_NOMOVE | SWP_NOZORDER);
 	}
 	return 1;
-}
+} // END of addTBButton(...)
 
+/*
+ * Show a drop-down menu from the toolbar button.
+ *
+ * @param hwnd  --  O&S dialog
+ * @param hwTB  --  toolbar handle
+ * @param uiItem -- id of toolbar item ? -- TODO: Check this.
+ */
 static void dropMenu(HWND hwnd, HWND hwTB, UINT uiItem)
 {
 	RECT r;
+    // Get the screen coords rectangle of the button
 	SendMessage(hwTB, TB_GETRECT, uiItem, (LPARAM) & r);
 	MapWindowPoints(hwTB, NULL, (LPPOINT) & r, 2);
 
+    // Set the area for the menu to avoid. ? :: TODO: see Platform SDK on TrackPopupMenuEx
 	TPMPARAMS tpm = { 0 };
 	tpm.cbSize = sizeof(tpm);
 	tpm.rcExclude = r;
 
+    // Create the menu structure.
 	HMENU hm = CreatePopupMenu();
 	AppendMenu(hm, MF_STRING, OW_EXPLORE_CMDID, "&Locate current folder with Explorer...");
 	AppendMenu(hm, MF_STRING, OW_SHOWDESK_CMDID, "Show &Desktop [for Gabriel]...");
+	AppendMenu(hm, MF_SEPARATOR | MF_DISABLED, 0, NULL);
+	AppendMenu(hm, MF_STRING, OW_ABOUT_CMDID, "&About OpenWide...");
 	SetMenuDefaultItem(hm, OW_SHOWDESK_CMDID, FALSE);
 /*
+// * This section is todo with having Favourite directories, and is unfinished.
+//
 	AppendMenu(hm, MF_STRING, OW_ADDFAV_CMDID, "Add &Favourite");
 	SetMenuDefaultItem(hm, OW_ADDFAV_CMDID, FALSE);
 	POWSharedData pow = lockSharedData();
@@ -137,12 +192,14 @@ static void dropMenu(HWND hwnd, HWND hwTB, UINT uiItem)
 		unlockSharedData(pow);
 	}
 */
-	AppendMenu(hm, MF_SEPARATOR | MF_DISABLED, 0, NULL);
-	AppendMenu(hm, MF_STRING, OW_ABOUT_CMDID, "&About OpenWide...");
+    // Display, track, then destroy the menu.
 	TrackPopupMenuEx(hm, TPM_HORIZONTAL | TPM_RIGHTALIGN | TPM_LEFTBUTTON | TPM_VERTICAL, r.right, r.bottom, hwnd, &tpm);
 	DestroyMenu(hm);
-}
+} // END of dropMenu(...)
+
+
 /*
+// add a new 'place' into the Places bar.
 int addPlace(HWND hwnd, PFavLink plk)
 {
 	HWND hwTB = GetDlgItem(hwnd, CID_PLACES);
@@ -156,7 +213,10 @@ int addPlace(HWND hwnd, PFavLink plk)
 	SendMessage(hwTB, TB_ADDBUTTONS, 1, (LPARAM) & tb);
 	return 1;
 }*/
+
 /*
+// Add a new favourite dir, first retrieving the path from the current view of the O&S dialog.
+// *unfinished*
 int	addFavourite(HWND hwnd)
 {
 	//static char szBuf[2*MAX_PATH+1];
@@ -183,9 +243,16 @@ int	addFavourite(HWND hwnd)
 	return 0;
 }
 */
+
+/*
+ * Given the handle to the O&S dialog, this does the magic to it, such as
+ * adding toolbar buttons, setting the focus and view mode, and adding items to
+ * the system menu.
+ *
+ * @returns 1, TODO:: There should be error indication, perhaps!
+ */
 int		openWide(HWND hwnd)
 {
-	dbg("DLL: openWide(%p)", hwnd);
 	// set placement
 	int w = gOwShared.szDim.cx;
 	int h = gOwShared.szDim.cy;
@@ -196,13 +263,14 @@ int		openWide(HWND hwnd)
 	// set view mode
 	HWND hwDirCtl = GetDlgItem(hwnd, CID_DIRLISTPARENT);
 	WORD	vCmdID = viewToCmdID(gOwShared.iView);
-//	dbg("Sending message to set view, cmd id %d", vCmdID);
+    // set the view mode, by sending a fake command message.
 	SendMessage(hwDirCtl, WM_COMMAND, MAKEWPARAM(vCmdID, 0), 0);
 
+    // set the focus!
 	focusDlgItem(hwnd, gOwShared.iFocus);
 
-	// debug hook, to find menu cmd IDs
 #ifdef	HOOK_SYSMSG
+	// debug hook, to find menu cmd IDs
 	dbg("Hooking SYSMSG...");
 	ghSysMsgHook = SetWindowsHookEx(
 						WH_SYSMSGFILTER,
@@ -212,28 +280,30 @@ int		openWide(HWND hwnd)
 				);
 	dbg("Hooking returned %p", ghSysMsgHook);
 #endif
+    // Allow drag&drop onto window. Unfortunately this doesn't work for the
+    // directory list, as that is already set to accept drops, as a command to
+    // copy/move files.  I would have to subclass this too, and that's rather
+    // more complicated.
 	DragAcceptFiles(hwnd, TRUE);
-	//SetWindowLong(hwnd, GWL_STYLE, GetWindowLong(hwnd, GWL_STYLE) | WS_CAPTION | WS_SYSMENU);
 
+    // Insert item into the system menu (right-click on titlebar)
 	HMENU hm = GetSystemMenu(hwnd, FALSE);
 	AppendMenu(hm, MF_SEPARATOR | MF_DISABLED, 0, NULL);
 	AppendMenu(hm, MF_STRING, OW_EXPLORE_CMDID, "&Locate current folder with Explorer...");
 	AppendMenu(hm, MF_STRING, OW_ABOUT_CMDID, "&About OpenWide...");
 
-	addTBButton(hwnd);
+	addTBButton(hwnd);  // add the toolbar button.
 /*
+//  Modify the dir-list view flags
 	HWND hwShellCtl = GetDlgItem(hwnd, CID_DIRLISTPARENT);
 	hwShellCtl = GetDlgItem(hwShellCtl, 1);
 	ListView_SetExtendedListViewStyleEx(hwShellCtl, OW_LISTVIEW_STYLE, OW_LISTVIEW_STYLE );
-
-	HWND hwOv = createOverlayWindow(hwnd);
-	dbg("Created overlay window: %p", hwOv);
-	SetWindowPos(hwOv, HWND_TOP, 0,0,0,0, SWP_NOMOVE | SWP_NOSIZE);
-	SetActiveWindow(hwnd);
-	DragAcceptFiles(hwOv, TRUE);*/
+*/
 	return 1;
-}
+} // END openWide(...)
 
+
+/* Load the desktop folder into the dir list */
 void	showDesktop(HWND hwnd)
 {
 	char * szDesk = GlobalAlloc(GPTR, MAX_PATH+1);
@@ -251,17 +321,26 @@ void	showDesktop(HWND hwnd)
 		free(szOld);
 		GlobalFree(szDesk);
 	}
-}
+} // END showDesktop
 
+
+/*
+ * This is the callback for the subclassed O&S dialog window, and it handles
+ * all the extra functionality, passing along messages to the old callback
+ * function unless the behaviour is modified.
+ *
+ */
 LRESULT CALLBACK WINAPI wpSubMain(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
 /*	if( gbDbg )
 	{
 		dbgWM(hwnd, msg, wp, lp);
 	}*/
+
+    // retrieve a ptr to the extra information associated with the window.
 	POWSubClassData pow = (POWSubClassData)GetProp(hwnd, OW_PROP_NAME);
 	if( !pow )
-		return DefWindowProc(hwnd, msg, wp, lp);
+		return DefWindowProc(hwnd, msg, wp, lp);    // something's broken, so just allow default window function.
 
 	static char buffer[MAX_PATH+1];
 
@@ -269,54 +348,51 @@ LRESULT CALLBACK WINAPI wpSubMain(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 	{
 		case WM_INITDIALOG:
 			{
-				dbg("DLL: INITDIALOG");
-				LRESULT lRes = CallWindowProc(pow->wpOrig, hwnd, msg, wp, lp);
-				ShowWindow(hwnd, SW_HIDE);
+                // dbg("DLL: INITDIALOG");
+				LRESULT lRes = CallWindowProc(pow->wpOrig, hwnd, msg, wp, lp);  // call the old callback
+				ShowWindow(hwnd, SW_HIDE);  // hide the window, until it's been magick-ed by openWide(...)
 				return lRes;
 			}
 			break;
+
 		case WM_SHOWWINDOW:
-			if( wp && !pow->bSet )
+			if( wp && !pow->bSet )  // catch the first SHOWWINDOW only, 
 			{
 				pow->bSet = TRUE;
 				openWide(hwnd);
 			}
 			break;
-		/*case WM_SIZE:
-			{
-				LRESULT lRes = CallWindowProc(pow->wpOrig, hwnd, msg, wp, lp);
-				int w = LOWORD(lp);
-				int h = HIWORD(lp);
-				MoveWindow( GetDlgItem(hwnd, CID_OVERLAY), 0,0, w,h, FALSE);
-				return lRes;
-			}
-			break;*/
-		case WM_COMMAND:
+
+		case WM_COMMAND:            // handle custom toolbar button commands, etc.
 			switch (LOWORD(wp))
 			{
-				case OW_ABOUT_CMDID:
+				case OW_ABOUT_CMDID:    // about
 					MessageBox(hwnd, "OpenWide is written by Luke Hudson. (c)2005", "About OpenWide", MB_OK);
 					return 0;
+                // show desktop item, or click on button rather than
+                // dropdown (ie, defaults to show desktop menuitem)
 				case OW_TBUTTON_CMDID:
 				case OW_SHOWDESK_CMDID:
 					showDesktop(hwnd);
 					break;
-				case OW_EXPLORE_CMDID:
+				case OW_EXPLORE_CMDID:  // Explore current dir in new Explorer window
 				{
+                    // Build a command line
 					char *szParm = "/select,";
 					wsprintf(buffer, szParm);
 					int len = strlen(szParm);
 					LPARAM lpBuf = (LPARAM)buffer + (LPARAM)len;
-					dbg("CDM_GET..PATH, cbSize=%d, buffer = %p", MAX_PATH-len, lpBuf);
+					//dbg("CDM_GET..PATH, cbSize=%d, buffer = %p", MAX_PATH-len, lpBuf);
 					len = SendMessage(hwnd, CDM_GETFOLDERPATH, MAX_PATH - len, lpBuf); //(LPARAM)(char *)((unsigned int)buffer + (unsigned int)len));
 					if (len)
 					{
-						dbg("Getfolderpath returned len %d, path: \"%s\"",len, buffer);
+                        // execute the command line
 						ShellExecute(hwnd, NULL, "explorer.exe", buffer, NULL, SW_SHOWNORMAL);
 					}
-				}
+				} // case
 					return 0;
 /*
+// Handling of favourites -- UNFININSHED
 				case OW_ADDFAV_CMDID:
 					doAddFave(hwnd);
 					return 0;
@@ -326,9 +402,10 @@ LRESULT CALLBACK WINAPI wpSubMain(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 						getFavourite(hwnd, (int)LOWORD(wp));
 					}
 					break;*/
-			}
+			} // switch : command ids
 			break;
 
+        // Handle notifications from the toolbar
 		case WM_NOTIFY:
 		{
 			NMHDR *phdr = (NMHDR *)lp;
@@ -349,6 +426,7 @@ LRESULT CALLBACK WINAPI wpSubMain(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 		}
 		break;
 
+        // handle notifications from the dir listview control
 		case WM_PARENTNOTIFY:
 			if( LOWORD(wp) ==  WM_CREATE)
 			{
@@ -360,13 +438,13 @@ LRESULT CALLBACK WINAPI wpSubMain(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 //					dbg("Shell defview ctl created");
 //					subclass((HWND)lp, wpSubShellCtl, (LPARAM)hwnd);
 					HWND hwLV = GetDlgItem((HWND)lp, 1);
-					DragAcceptFiles(hwLV, TRUE);
 					if( hwLV )
 					{
-						if( GetWindowLong(hwLV, GWL_STYLE) & LVS_REPORT )
+						if( GetWindowLong(hwLV, GWL_STYLE) & LVS_REPORT ) // if details view is in effect.
 						{
-							//dbg("hwLV is in report mode -- setting extended style");
+                            // update style flags
 							ListView_SetExtendedListViewStyleEx(hwLV, OW_LISTVIEW_STYLE, OW_LISTVIEW_STYLE );
+                            // Send Control+NumpadPlus to expand all the columns to fit contents
 							INPUT in[4] = {0};
 							in[0].type = INPUT_KEYBOARD;
 							in[0].ki.wVk = VK_CONTROL;
@@ -383,10 +461,11 @@ LRESULT CALLBACK WINAPI wpSubMain(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 							SetFocus(hwOld);
 						}
 					}
-					SetTimer(hwnd, 251177, 1, NULL);
+                    //SetTimer(hwnd, 251177, 1, NULL);    // set a timer, for what? TODO:: Check this
 				}
 			}
 			break;
+/// Deprecated -- I think? TODO: Check
 /*		case WM_TIMER:
 			if( wp == 251177 )
 			{
@@ -404,7 +483,7 @@ LRESULT CALLBACK WINAPI wpSubMain(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			}
 			break;
 s*/
-		case WM_SYSCOMMAND:
+		case WM_SYSCOMMAND:     // Handle system menu commands
 			{
 				int cmdId = wp & 0xFFF0;
 				if( cmdId == OW_ABOUT_CMDID )
@@ -425,18 +504,7 @@ s*/
 				}
 			}
 			break;
-/*		case WM_NOTIFY:
-			{
-				NMHDR * phdr = (NMHDR *)lp;
-				HWND hwSV = GetDlgItem(hwnd, CID_DIRLISTPARENT);
-				hwSV = GetDlgItem(hwSV, CID_DIRLIST);
-				if( phdr->hwndFrom == hwSV )
-				{
-					dbg("Got notify %d from listview", phdr->code);
-				}
-			}
-			break;*/
-/*		case WM_NCPAINT:
+/*		case WM_NCPAINT:    // handle painting of non-content area, ie. window titlebar and frame.
 			{
 				HDC hdc = GetWindowDC(hwnd);
 				HBRUSH hbrOld;
@@ -455,17 +523,17 @@ s*/
 				ReleaseDC(hwnd, hdc);
 			}
 			break;*/
-		case WM_DROPFILES:
+		case WM_DROPFILES:  // Handle files which are dragged&dropped onto window.
 			{
 				HANDLE hDrop = (HANDLE)wp;
 				int nFiles = DragQueryFile(hDrop, (UINT)-1, NULL, 0);
-				//dbg("%d files dropped on main window %p", nFiles, hwnd);
 				if( nFiles == 1 )
 				{
 					if( DragQueryFile(hDrop, 0, buffer, MAX_PATH) )
 					{
 						if( PathIsDirectory(buffer) )
 						{
+                            // Set the view to dropped directory path.
 							SetDlgItemText(hwnd, CID_FNAME, buffer);
 							SendDlgItemMessage(hwnd, CID_FNAME, EM_SETSEL, -1, -1);
 							SendDlgItemMessage(hwnd, CID_FNAME, EM_REPLACESEL, FALSE, (LPARAM)"\\");
@@ -486,22 +554,29 @@ s*/
 				if( openSharedMem() )
 				{
 					//dbg("DLL: Opened shared memory");
-					if( --gpSharedMem->refCount < 0 )
+					if( --gpSharedMem->refCount < 0 )   // Update the count for number of users of subclass code
 						gpSharedMem->refCount = 0;
-					//dbg("DLL: dec'd refCount to %d, posting msg %x to app window %p", gpSharedMem->refCount, gpSharedMem->iCloseMsg, gpSharedMem->hwListener);
+                    //dbg("DLL: dec'd refCount to %d, posting msg %x to app window %p", gpSharedMem->refCount,
+                    //  gpSharedMem->iCloseMsg, gpSharedMem->hwListener);
+
+                    // Notify application that another O&S dialog has closed
 					PostMessage( gpSharedMem->hwListener, gpSharedMem->iCloseMsg, 0,0);
+                    // Release any hold on the shared memory.
 					closeSharedMem();
-					//dbg("DLL: Closed shared memory");
 				}
+                // Remove subclassing
 				WNDPROC wpOrig = pow->wpOrig;
 				unsubclass(hwnd);
+                // Call original WM_DESTROY
 				return CallWindowProc(wpOrig, hwnd, msg, wp, lp);
 			}
 			break;
 	}
 	return CallWindowProc(pow->wpOrig, hwnd, msg, wp, lp);
-}
+} // END wpSubMain
 
+
+// Subclass the listview control -- TODO: I think this is un-needed
 LRESULT CALLBACK WINAPI wpSubShellCtl(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
 	POWSubClassData pow = (POWSubClassData)GetProp(hwnd, OW_PROP_NAME);
@@ -528,8 +603,12 @@ LRESULT CALLBACK WINAPI wpSubShellCtl(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			break;
 	}
 	return CallWindowProc(pow->wpOrig, hwnd, msg, wp, lp);
-}
+} // END wpSubShellCtl
 
+
+/* Check whether this application has been excluded, ie, whether we should not
+ * mess with its O&S dialogs
+ */
 static BOOL isExcluded(const char *szApp)
 {
 	BOOL bEx = FALSE;
@@ -543,6 +622,9 @@ static BOOL isExcluded(const char *szApp)
 }
 
 
+/* 
+ * Investigate the WM_CREATEPARAMS message
+ */
 static void	dbgCreateParams(LPVOID lpCreateParams)
 {
 	UNALIGNED short * pcbData = (UNALIGNED short *)lpCreateParams;
@@ -579,6 +661,10 @@ static void	dbgCreateParams(LPVOID lpCreateParams)
 		dbg("CreateParams is NULL (%p)", pcbData);
 }
 
+
+/*
+ * This is the main hook callback, which watches window creation, and
+ * subclasses those which appear (with luck, correctly) to be O&S dialogs */
 static LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
 
@@ -645,8 +731,11 @@ static LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam)
      }
     // Call the next hook, if there is one
     return CallNextHookEx(ghMsgHook, nCode, wParam, lParam);
-}
+} // END CBTProc
 
+/* 
+ * Access to shared memory, and copy data to cache
+ */
 int	openSharedMem(void)
 {
 	if( ghMap != NULL || gpSharedMem != NULL )
@@ -655,7 +744,7 @@ int	openSharedMem(void)
 	if(!waitForMutex())
 		return 0;
 	
-	ghMap = OpenFileMapping(FILE_MAP_WRITE, TRUE, OW_SHARED_FILE_MAPPING);
+	ghMap = OpenFileMapping(FILE_MAP_WRITE, FALSE, OW_SHARED_FILE_MAPPING);
 	if( ghMap )
 	{
 		gpSharedMem = (POWSharedData)MapViewOfFile(ghMap, FILE_MAP_WRITE, 0,0, 0);
@@ -668,8 +757,11 @@ int	openSharedMem(void)
 			closeSharedMem();
 	}
 	return 0;
-}
+} // END openSharedMem
 
+/*
+ * Release any access to shared memory we may hold.
+ */
 void closeSharedMem(void)
 {
 	if( gpSharedMem )
@@ -683,8 +775,15 @@ void closeSharedMem(void)
 		ghMap = NULL;
 	}
 	releaseMutex();
-}
+} // END closeSharedMem
 
+
+/*
+ * Simply refreshes our cache of the shared data.
+ * Use this as a preference to the open/close-SharedMem functions.
+ *
+ * @returns 1 if successful, 0 on error.
+ */
 int getSharedData(void)
 {
 	int		rv = 0;
@@ -697,6 +796,9 @@ int getSharedData(void)
 }
 
 
+/*
+ * exported function to setup the CBT hook, which watches window creation.
+ */
 int DLLEXPORT setHook(void)
 {
 	if(ghMsgHook != NULL)
@@ -724,6 +826,9 @@ int DLLEXPORT setHook(void)
 }
 
 
+/*
+ * Exported function to remove the CBT hook.
+ */
 int DLLEXPORT rmvHook(void)
 {
 	if( !ghMsgHook )
@@ -747,6 +852,8 @@ int DLLEXPORT rmvHook(void)
 
 
 /*
+// This callback handles SYSMSG hooks, which I have used to investigate the O&S dialog behaviour.
+//
 static LRESULT CALLBACK SysMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
     HWND hwnd;
@@ -802,6 +909,11 @@ static LRESULT CALLBACK SysMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
 }
 */
 
+
+
+/*
+ * Main DLL entry point
+ */
 BOOL DLLEXPORT WINAPI DLLPROC(HINSTANCE hDLLInst, DWORD fdwReason, LPVOID lpvReserved)
 {
     switch (fdwReason)
