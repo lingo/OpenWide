@@ -12,7 +12,7 @@
 SetCompressor lzma
 
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
-OutFile "OpenWide1_3bSetup.exe"
+OutFile "OpenWide_Setup.exe"
 LoadLanguageFile "${NSISDIR}\Contrib\Language files\English.nlf"
 InstallDir "$PROGRAMFILES\OpenWide"
 Icon "${NSISDIR}\Contrib\Graphics\Icons\arrow2-install.ico"
