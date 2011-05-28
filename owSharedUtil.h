@@ -44,6 +44,7 @@ char * getDlgItemText(HWND hwnd, UINT uID);
 DWORD GetDllVersion(LPCTSTR lpszDllName);
 const char * geterrmsg(void);
 BOOL isWinXP(void);
+BOOL DLLEXPORT isWin7(void);
 void regCloseKey(HKEY hk);
 HKEY regCreateKey(HKEY hkParent, const char *szSubKey);
 int regDeleteKey(HKEY hkParent, const char *szSubKey);

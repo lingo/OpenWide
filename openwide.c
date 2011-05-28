@@ -510,7 +510,7 @@ LRESULT WINAPI CALLBACK wpListener(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 BOOL WINAPI CALLBACK wpPlacement(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
 	static LPRECT pr = NULL;
-	static BOOL bXP;	// Are we using WinXP ? -- Changes the minimum dialog dimensions.
+	static BOOL bXP, bWin7;	// Are we using WinXP ? -- Changes the minimum dialog dimensions.
 	switch(msg)
 	{
 		case WM_INITDIALOG:
@@ -518,6 +518,7 @@ BOOL WINAPI CALLBACK wpPlacement(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			if(!pr)
 				EndDialog(hwnd, 0);
 			bXP = isWinXP();
+			bWin7 = isWin7();
 			MoveWindow(hwnd, pr->left, pr->top, pr->right, pr->bottom, FALSE);
 			break;
 
@@ -544,9 +545,10 @@ BOOL WINAPI CALLBACK wpPlacement(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 				{
 					pmm->ptMinTrackSize.x = OW_XP_MINWIDTH;
 					pmm->ptMinTrackSize.y = OW_XP_MINHEIGHT;
-				}
-				else
-				{
+				} else if (bWin7) {
+					pmm->ptMinTrackSize.x = OW_7_MINWIDTH;
+					pmm->ptMinTrackSize.y = OW_7_MINHEIGHT;
+				} else {
 					pmm->ptMinTrackSize.x = OW_2K_MINWIDTH;
 					pmm->ptMinTrackSize.y = OW_2K_MINHEIGHT;
 				}

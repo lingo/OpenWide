@@ -80,7 +80,10 @@ enum OW_COMMANDS {
 #define PACKVERSION(major,minor) MAKELONG(minor,major)
 
 #define	OW_MATCH_STYLE			0x82CC20C4
+#define	OW_MATCH_STYLE_W7		0x82CC02C4
 #define	OW_MATCH_EXSTYLE		0x00010501
+#define	OW_MATCH_EXSTYLE_W7		0x00010101
+
 
 #define	OW_SHARED_FILE_MAPPING	("openwidedll_shared_memfile")
 #define	OW_MUTEX_NAME			("openwidedll_mem_mutex")
@@ -95,6 +98,9 @@ enum OW_COMMANDS {
 
 #define	OW_XP_MINWIDTH			563
 #define	OW_XP_MINHEIGHT			419
+
+#define	OW_7_MINWIDTH			625
+#define	OW_7_MINHEIGHT			434
 
 #define	OW_LISTVIEW_STYLE	(LVS_EX_FULLROWSELECT)
 

@@ -122,6 +122,11 @@ BOOL isWinXP(void)
 	return GetDllVersion("Shell32.dll") >= PACKVERSION(6,00);
 }
 
+/* Determines if windows 7 is running -- TODO: This may need checking for newer versions ? */
+BOOL DLLEXPORT isWin7(void)
+{
+	return GetDllVersion("Shell32.dll") >= PACKVERSION(6, 01);
+}
 
 
 /* Wrapper around RegCloseKey, used for consistency with the other reg* functions */

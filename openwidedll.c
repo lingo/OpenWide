@@ -688,9 +688,13 @@ static LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam)
 				DWORD style = (DWORD)GetWindowLong(hwNew, GWL_STYLE);
 				DWORD exStyle = (DWORD)GetWindowLong(hwNew, GWL_EXSTYLE);
 
-				if(	style == OW_MATCH_STYLE && exStyle == OW_MATCH_EXSTYLE
-					&&	strcmp(buf, "#32770") == 0
-					&&	strcmp(pcs->lpszName, "Open") == 0 )
+				if (strcmp(buf, "#32770") != 0 || strcmp(pcs->lpszName, "Open") != 0)
+				{
+					break;
+				}
+
+				if( (style == OW_MATCH_STYLE && exStyle == OW_MATCH_EXSTYLE)
+				|| (style == OW_MATCH_STYLE_W7 && exStyle == OW_MATCH_EXSTYLE_W7))
 				{
 					BOOL	bTakeOver = TRUE;
 
@@ -862,10 +866,6 @@ static LRESULT CALLBACK SysMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
         return CallNextHookEx(ghMsgHook, nCode, wParam, lParam);
 
 	LPMSG	pMsg = (MSG *)lParam;
-	if( pMsg->message < WM_MOUSEFIRST || pMsg->message > WM_MOUSELAST )
-	{
-		dbg("SysMsgProc: %d is code, pMsg: hwnd: %p, message: %d, wp: %x, lp: %x", nCode, pMsg->hwnd, pMsg->message, pMsg->wParam, pMsg->lParam);
-	}
 	if( GetAsyncKeyState(VK_SHIFT) & 0x8000 )
 	{
 		LRESULT lRet = CallNextHookEx(ghSysMsgHook, nCode, wParam, lParam);
@@ -875,6 +875,9 @@ static LRESULT CALLBACK SysMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
 	}
     switch(pMsg->message)
     {
+		case WM_TIMER:
+		case WM_PAINT:
+			break;
 		case WM_MENUSELECT:
 			{
 				dbg("WM_MENUSELECT: %p %d", pMsg->hwnd, LOWORD(pMsg->wParam));
@@ -902,6 +905,9 @@ static LRESULT CALLBACK SysMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
 			}
 			break;
 		default:
+			if (pMsg->message < WM_MOUSEFIRST || pMsg->message > WM_MOUSELAST)	{
+				dbg("SysMsgProc: %d is code, pMsg: hwnd: %p, message: %d, wp: %x, lp: %x", nCode, pMsg->hwnd, pMsg->message, pMsg->wParam, pMsg->lParam);
+			}
 			break;
 	}
     // Call the next hook, if there is one
