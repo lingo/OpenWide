@@ -398,7 +398,7 @@ void	showSettingsDlg(HWND hwnd)
  *
  * TODO:  Make sure the above statement is actually correct, and sort the functions into these sorts of categories somewhere.
  */
-void	doQuit(void)
+void	doQuit(void) {
 	if( ghwPropSheet )	// don't quit with the settings dialog open
 	{
 		SetForegroundWindow(ghwPropSheet);
@@ -666,7 +666,7 @@ int WINAPI WinMain(HINSTANCE hi, HINSTANCE hiPrv, LPSTR fakeCmdLine, int iShow)
 		if( !PropSheet_GetCurrentPageHwnd(ghwPropSheet) )
 		{
 			DestroyWindow(ghwPropSheet);
-			ghwPropSheet=NULL;
+			ghwPropSheet=(void *)NULL;
 		}
 	}
 //	dbg("OWApp: Shutting down");
