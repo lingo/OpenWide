@@ -367,7 +367,7 @@ void	doTrayMenu(HWND hwnd)
 
 	// Popup the menu
 	TrackPopupMenu(hm, TPM_RIGHTBUTTON | TPM_BOTTOMALIGN | TPM_RIGHTALIGN,
-		pt.x, pt.y, 0, hwnd, NULL);
+		pt.x+8, pt.y+8, 0, hwnd, NULL);
 
 	// Delete the menu structure again.
 	DestroyMenu(hm);
@@ -442,7 +442,7 @@ LRESULT WINAPI CALLBACK wpListener(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			switch(LOWORD(wp))
 			{
 				case IDM_ABOUT:
-					MessageBox(hwnd, "OpenWide is written by Luke Hudson. (c)2005\r\nSee http://lingo.atspace.com", "About OpenWide", MB_OK);
+					MessageBox(hwnd, "OpenWide is written by Luke Hudson. (c)2005-2011\r\nSee http://speak.geek.nz", "About OpenWide", MB_OK);
 					break;
 				case IDM_SETTINGS:
 					showSettingsDlg(hwnd);
